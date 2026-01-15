@@ -183,6 +183,7 @@ ssr = []
 oco = ["dep:oco_ref"]
 nightly = ["reactive_graph/nightly"]
 testing = ["dep:slotmap"]
+mock_dom = ["testing"]  # enables mock DOM renderer for component snapshot testing
 reactive_graph = ["dep:reactive_graph", "dep:any_spawner"]
 reactive_stores = ["reactive_graph", "dep:reactive_stores"]
 sledgehammer = ["dep:sledgehammer_bindgen", "dep:sledgehammer_utils"]

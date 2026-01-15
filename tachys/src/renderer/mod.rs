@@ -5,6 +5,17 @@ use wasm_bindgen::JsValue;
 /// A DOM renderer.
 pub mod dom;
 
+#[cfg(feature = "mock_dom")]
+/// A renderer based on a mock DOM for testing.
+///
+/// Note: This module is available when the `mock_dom` feature is enabled, but it
+/// does NOT replace the default DOM renderer. It is intended for unit testing
+/// individual renderer functions without requiring a browser environment.
+///
+/// For component snapshot testing, use SSR (server-side rendering) which produces
+/// HTML strings without requiring a browser.
+pub mod mock_dom;
+
 /// The renderer being used for the application.
 ///
 /// ### Note
@@ -28,13 +39,6 @@ pub mod types {
         TemplateElement, Text,
     };
 }
-
-/* #[cfg(feature = "testing")]
-/// A renderer based on a mock DOM.
-pub mod mock_dom;
-/// A DOM renderer optimized for element creation.
-#[cfg(feature = "sledgehammer")]
-pub mod sledgehammer; */
 
 /// Implements the instructions necessary to render an interface on some platform.
 ///

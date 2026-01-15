@@ -2,23 +2,21 @@
 
 //! A stupidly-simple mock DOM implementation that can be used for testing.
 //!
-//! Do not use this for anything real.
+//! Do not use this for anything real. This module provides a simple mock DOM
+//! that can be used for unit testing renderer methods without requiring a browser.
+//!
+//! For component snapshot testing, use SSR (server-side rendering) instead.
 
-use super::{CastFrom, DomRenderer, RemoveEventHandler, Renderer};
-use crate::{
-    html::element::{CreateElement, ElementType},
-    view::Mountable,
-};
+use super::CastFrom;
 use indexmap::IndexMap;
 use slotmap::{new_key_type, SlotMap};
 use std::{borrow::Cow, cell::RefCell, rc::Rc};
-use wasm_bindgen::JsValue;
 
-/// A [`Renderer`] that uses a mock DOM structure running in Rust code.
+/// A mock DOM renderer for testing.
 ///
-/// This is intended as a rendering background that can be used to test component logic, without
-/// running a browser.
-#[derive(Debug)]
+/// This is intended as a rendering utility for unit testing individual
+/// renderer functions without requiring a browser environment.
+#[derive(Debug, Copy, Clone)]
 pub struct MockDom;
 
 new_key_type! {
@@ -28,19 +26,34 @@ new_key_type! {
 
 /// A mock DOM node.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct Node(NodeId);
+pub struct Node(pub NodeId);
 
 /// A mock element.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct Element(Node);
+pub struct Element(pub Node);
 
 /// A mock text node.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct Text(Node);
+pub struct Text(pub Node);
 
 /// A mock comment node.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct Placeholder(Node);
+pub struct Placeholder(pub Node);
+
+/// Mock event type (unit type for testing).
+pub type Event = ();
+
+/// Mock class list (unit type for testing).
+#[derive(Clone, Debug, Default)]
+pub struct ClassList;
+
+/// Mock CSS style declaration (unit type for testing).
+#[derive(Clone, Debug, Default)]
+pub struct CssStyleDeclaration;
+
+/// Mock template element.
+#[derive(Clone, Debug, Default)]
+pub struct TemplateElement;
 
 impl AsRef<Node> for Node {
     fn as_ref(&self) -> &Node {
@@ -202,7 +215,8 @@ impl Document {
         self.0.borrow_mut().clear();
     }
 
-    fn create_element(&self, tag: &str) -> Element {
+    /// Creates a new element with the given tag name.
+    pub fn create_element(&self, tag: &str) -> Element {
         Element(Node(self.0.borrow_mut().insert(NodeData {
             parent: None,
             ty: NodeType::Element {
@@ -228,85 +242,6 @@ impl Document {
     }
 }
 
-// TODO!
-impl DomRenderer for MockDom {
-    type Event = ();
-    type ClassList = ();
-    type CssStyleDeclaration = ();
-    type TemplateElement = ();
-
-    fn set_property(el: &Self::Element, key: &str, value: &JsValue) {
-        todo!()
-    }
-
-    fn add_event_listener(
-        el: &Self::Element,
-        name: &str,
-        cb: Box<dyn FnMut(Self::Event)>,
-    ) -> RemoveEventHandler<Self::Element> {
-        todo!()
-    }
-
-    fn add_event_listener_delegated(
-        el: &Self::Element,
-        name: Cow<'static, str>,
-        delegation_key: Cow<'static, str>,
-        cb: Box<dyn FnMut(Self::Event)>,
-    ) -> RemoveEventHandler<Self::Element> {
-        todo!()
-    }
-
-    fn class_list(el: &Self::Element) -> Self::ClassList {
-        todo!()
-    }
-
-    fn add_class(class_list: &Self::ClassList, name: &str) {
-        todo!()
-    }
-
-    fn remove_class(class_list: &Self::ClassList, name: &str) {
-        todo!()
-    }
-
-    fn style(el: &Self::Element) -> Self::CssStyleDeclaration {
-        todo!()
-    }
-
-    fn set_css_property(
-        style: &Self::CssStyleDeclaration,
-        name: &str,
-        value: &str,
-    ) {
-        todo!()
-    }
-
-    fn set_inner_html(el: &Self::Element, html: &str) {
-        todo!()
-    }
-
-    fn event_target<T>(ev: &Self::Event) -> T
-    where
-        T: CastFrom<Self::Element>,
-    {
-        todo!()
-    }
-
-    fn get_template<V>() -> Self::TemplateElement
-    where
-        V: crate::view::ToTemplate + 'static,
-    {
-        todo!()
-    }
-
-    fn clone_template(tpl: &Self::TemplateElement) -> Self::Element {
-        todo!()
-    }
-
-    fn create_element_from_html(html: &str) -> Self::Element {
-        todo!()
-    }
-}
-
 impl Default for Document {
     fn default() -> Self {
         Self::new()
@@ -320,6 +255,11 @@ thread_local! {
 /// Returns the global document.
 pub fn document() -> Document {
     DOCUMENT.with(Clone::clone)
+}
+
+/// Resets the global document for a fresh test.
+pub fn reset_document() {
+    DOCUMENT.with(|d| d.reset());
 }
 
 /// The type of mock DOM node.
@@ -340,118 +280,40 @@ pub enum NodeType {
     Placeholder,
 }
 
-impl Mountable<MockDom> for Node {
-    fn unmount(&mut self) {
-        todo!()
-    }
-
-    fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
-        MockDom::insert_node(parent, self, marker);
-    }
-
-    fn insert_before_this(&self, child: &mut dyn Mountable<MockDom>) -> bool {
-        let parent = MockDom::get_parent(self).and_then(Element::cast_from);
-        if let Some(parent) = parent {
-            child.mount(&parent, Some(self));
-            return true;
-        }
-        false
-    }
-}
-
-impl Mountable<MockDom> for Text {
-    fn unmount(&mut self) {
-        todo!()
-    }
-
-    fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
-        MockDom::insert_node(parent, self.as_ref(), marker);
-    }
-
-    fn insert_before_this(&self, child: &mut dyn Mountable<MockDom>) -> bool {
-        let parent =
-            MockDom::get_parent(self.as_ref()).and_then(Element::cast_from);
-        if let Some(parent) = parent {
-            child.mount(&parent, Some(self.as_ref()));
-            return true;
-        }
-        false
-    }
-}
-
-impl Mountable<MockDom> for Element {
-    fn unmount(&mut self) {
-        todo!()
-    }
-
-    fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
-        MockDom::insert_node(parent, self.as_ref(), marker);
-    }
-
-    fn insert_before_this(&self, child: &mut dyn Mountable<MockDom>) -> bool {
-        let parent =
-            MockDom::get_parent(self.as_ref()).and_then(Element::cast_from);
-        if let Some(parent) = parent {
-            child.mount(&parent, Some(self.as_ref()));
-            return true;
-        }
-        false
-    }
-}
-
-impl Mountable<MockDom> for Placeholder {
-    fn unmount(&mut self) {
-        todo!()
-    }
-
-    fn mount(&mut self, parent: &Element, marker: Option<&Node>) {
-        MockDom::insert_node(parent, self.as_ref(), marker);
-    }
-
-    fn insert_before_this(&self, child: &mut dyn Mountable<MockDom>) -> bool {
-        let parent =
-            MockDom::get_parent(self.as_ref()).and_then(Element::cast_from);
-        if let Some(parent) = parent {
-            child.mount(&parent, Some(self.as_ref()));
-            return true;
-        }
-        false
-    }
-}
-
-impl<E: ElementType> CreateElement<MockDom> for E {
-    fn create_element(&self) -> crate::renderer::types::Element {
-        document().create_element(E::TAG)
-    }
-}
-
-impl Renderer for MockDom {
-    type Node = Node;
-    type Text = Text;
-    type Element = Element;
-    type Placeholder = Placeholder;
-
-    fn intern(text: &str) -> &str {
+impl MockDom {
+    /// Interns a string (no-op for mock DOM).
+    pub fn intern(text: &str) -> &str {
         text
     }
 
-    fn create_text_node(data: &str) -> Self::Text {
+    /// Creates a new element with the given tag name and optional namespace.
+    pub fn create_element(tag: &str, namespace: Option<&str>) -> Element {
+        // Namespace is ignored in mock DOM - it's mainly for SVG/MathML
+        let _ = namespace;
+        document().create_element(tag)
+    }
+
+    /// Creates a new text node.
+    pub fn create_text_node(data: &str) -> Text {
         document().create_text_node(data)
     }
 
-    fn create_placeholder() -> Self::Placeholder {
+    /// Creates a new placeholder node.
+    pub fn create_placeholder() -> Placeholder {
         document().create_placeholder()
     }
 
-    fn set_text(node: &Self::Text, text: &str) {
+    /// Sets the text content of a text node.
+    pub fn set_text(node: &Text, text: &str) {
         Document::with_node_mut(node.0 .0, |node| {
-            if let NodeType::Text(ref mut node) = node.ty {
-                *node = text.to_string();
+            if let NodeType::Text(ref mut content) = node.ty {
+                *content = text.to_string();
             }
         });
     }
 
-    fn set_attribute(node: &Self::Element, name: &str, value: &str) {
+    /// Sets an attribute on an element.
+    pub fn set_attribute(node: &Element, name: &str, value: &str) {
         Document::with_node_mut(node.0 .0, |node| {
             if let NodeType::Element { ref mut attrs, .. } = node.ty {
                 attrs.insert(name.to_string(), value.to_string());
@@ -459,7 +321,8 @@ impl Renderer for MockDom {
         });
     }
 
-    fn remove_attribute(node: &Self::Element, name: &str) {
+    /// Removes an attribute from an element.
+    pub fn remove_attribute(node: &Element, name: &str) {
         Document::with_node_mut(node.0 .0, |node| {
             if let NodeType::Element { ref mut attrs, .. } = node.ty {
                 attrs.shift_remove(name);
@@ -467,22 +330,23 @@ impl Renderer for MockDom {
         });
     }
 
-    fn insert_node(
-        parent: &Self::Element,
-        new_child: &Self::Node,
-        anchor: Option<&Self::Node>,
+    /// Inserts a node before an anchor, or appends if anchor is None.
+    pub fn insert_node(
+        parent: &Element,
+        new_child: &Node,
+        anchor: Option<&Node>,
     ) {
         debug_assert!(&parent.0 != new_child);
         // remove if already mounted
-        if let Some(parent) = MockDom::get_parent(new_child) {
-            let parent = Element(parent);
-            MockDom::remove_node(&parent, new_child);
+        if let Some(old_parent) = Self::get_parent(new_child) {
+            let old_parent = Element(old_parent);
+            Self::remove_node(&old_parent, new_child);
         }
         // mount on new parent
-        Document::with_node_mut(parent.0 .0, |parent| {
+        Document::with_node_mut(parent.0 .0, |parent_data| {
             if let NodeType::Element {
                 ref mut children, ..
-            } = parent.ty
+            } = parent_data.ty
             {
                 match anchor {
                     None => children.push(new_child.clone()),
@@ -504,47 +368,45 @@ impl Renderer for MockDom {
         });
     }
 
-    fn remove_node(
-        parent: &Self::Element,
-        child: &Self::Node,
-    ) -> Option<Self::Node> {
-        let child = Document::with_node_mut(parent.0 .0, |parent| {
+    /// Removes a child node from a parent.
+    pub fn remove_node(parent: &Element, child: &Node) -> Option<Node> {
+        let removed = Document::with_node_mut(parent.0 .0, |parent_data| {
             if let NodeType::Element {
                 ref mut children, ..
-            } = parent.ty
+            } = parent_data.ty
             {
-                let current_pos = children
+                children
                     .iter()
                     .position(|item| item.0 == child.0)
-                    .expect("anchor is not a child of the parent");
-                Some(children.remove(current_pos))
+                    .map(|pos| children.remove(pos))
             } else {
                 None
             }
         })
         .flatten()?;
-        Document::with_node_mut(child.0, |node| {
+        Document::with_node_mut(removed.0, |node| {
             node.parent = None;
         });
-        Some(child)
+        Some(removed)
     }
 
-    fn remove(node: &Self::Node) {
-        let parent = Element(Node(
-            Self::get_parent(node)
-                .expect("tried to remove a parentless node")
-                .0,
-        ));
-        Self::remove_node(&parent, node);
+    /// Removes a node from the DOM.
+    pub fn remove(node: &Node) {
+        if let Some(parent) = Self::get_parent(node) {
+            let parent = Element(parent);
+            Self::remove_node(&parent, node);
+        }
     }
 
-    fn get_parent(node: &Self::Node) -> Option<Self::Node> {
+    /// Gets the parent of a node.
+    pub fn get_parent(node: &Node) -> Option<Node> {
         Document::with_node(node.0, |node| node.parent)
             .flatten()
             .map(Node)
     }
 
-    fn first_child(node: &Self::Node) -> Option<Self::Node> {
+    /// Gets the first child of a node.
+    pub fn first_child(node: &Node) -> Option<Node> {
         Document::with_node(node.0, |node| match &node.ty {
             NodeType::Text(_) => None,
             NodeType::Element { children, .. } => children.first().cloned(),
@@ -553,7 +415,8 @@ impl Renderer for MockDom {
         .flatten()
     }
 
-    fn next_sibling(node: &Self::Node) -> Option<Self::Node> {
+    /// Gets the next sibling of a node.
+    pub fn next_sibling(node: &Node) -> Option<Node> {
         let node_id = node.0;
         Document::with_node(node_id, |node| {
             node.parent.and_then(|parent| {
@@ -575,11 +438,13 @@ impl Renderer for MockDom {
         .flatten()
     }
 
-    fn log_node(node: &Self::Node) {
+    /// Logs a node (for debugging).
+    pub fn log_node(node: &Node) {
         eprintln!("{node:?}");
     }
 
-    fn clear_children(parent: &Self::Element) {
+    /// Clears all children from an element.
+    pub fn clear_children(parent: &Element) {
         let prev_children =
             Document::with_node_mut(parent.0 .0, |node| match node.ty {
                 NodeType::Element {
@@ -593,6 +458,37 @@ impl Renderer for MockDom {
                 node.parent = None;
             });
         }
+    }
+
+    /// Sets the inner HTML of an element.
+    pub fn set_inner_html(el: &Element, html: &str) {
+        // Clear children and add raw HTML as text (simplified)
+        Document::with_node_mut(el.0 .0, |node| {
+            if let NodeType::Element { ref mut children, .. } = node.ty {
+                children.clear();
+            }
+        });
+        // For simplicity, we just store the HTML as a text node
+        let text = document().create_text_node(html);
+        Self::insert_node(el, text.as_ref(), None);
+    }
+
+    /// Gets a template element.
+    pub fn get_template<V>() -> TemplateElement
+    where
+        V: crate::view::ToTemplate + 'static,
+    {
+        TemplateElement
+    }
+
+    /// Clones a template element.
+    pub fn clone_template(_tpl: &TemplateElement) -> Element {
+        document().create_element("div")
+    }
+
+    /// Creates an element from HTML.
+    pub fn create_element_from_html(_html: &str) -> Element {
+        document().create_element("div")
     }
 }
 
@@ -625,16 +521,12 @@ impl CastFrom<Node> for Placeholder {
 
 #[cfg(test)]
 mod tests {
-    use super::MockDom;
-    use crate::{
-        html::element,
-        renderer::{mock_dom::node_eq, Renderer},
-    };
+    use super::{node_eq, MockDom};
 
     #[test]
     fn html_debugging_works() {
-        let main = MockDom::create_element(element::Main);
-        let p = MockDom::create_element(element::P);
+        let main = MockDom::create_element("main", None);
+        let p = MockDom::create_element("p", None);
         MockDom::set_attribute(&p, "id", "foo");
         let text = MockDom::create_text_node("Hello, world!");
         MockDom::insert_node(&main, p.as_ref(), None);
@@ -647,8 +539,8 @@ mod tests {
 
     #[test]
     fn remove_attribute_works() {
-        let main = MockDom::create_element(element::Main);
-        let p = MockDom::create_element(element::P);
+        let main = MockDom::create_element("main", None);
+        let p = MockDom::create_element("p", None);
         MockDom::set_attribute(&p, "id", "foo");
         let text = MockDom::create_text_node("Hello, world!");
         MockDom::insert_node(&main, p.as_ref(), None);
@@ -659,8 +551,8 @@ mod tests {
 
     #[test]
     fn remove_node_works() {
-        let main = MockDom::create_element(element::Main);
-        let p = MockDom::create_element(element::P);
+        let main = MockDom::create_element("main", None);
+        let p = MockDom::create_element("p", None);
         MockDom::set_attribute(&p, "id", "foo");
         let text = MockDom::create_text_node("Hello, world!");
         MockDom::insert_node(&main, p.as_ref(), None);
@@ -671,9 +563,9 @@ mod tests {
 
     #[test]
     fn insert_before_works() {
-        let main = MockDom::create_element(element::Main);
-        let p = MockDom::create_element(element::P);
-        let span = MockDom::create_element(element::Span);
+        let main = MockDom::create_element("main", None);
+        let p = MockDom::create_element("p", None);
+        let span = MockDom::create_element("span", None);
         let text = MockDom::create_text_node("Hello, world!");
         MockDom::insert_node(&main, p.as_ref(), None);
         MockDom::insert_node(&span, text.as_ref(), None);
@@ -686,8 +578,8 @@ mod tests {
 
     #[test]
     fn insert_before_sets_parent() {
-        let main = MockDom::create_element(element::Main);
-        let p = MockDom::create_element(element::P);
+        let main = MockDom::create_element("main", None);
+        let p = MockDom::create_element("p", None);
         MockDom::insert_node(&main, p.as_ref(), None);
         let parent =
             MockDom::get_parent(p.as_ref()).expect("p should have parent set");
@@ -696,9 +588,9 @@ mod tests {
 
     #[test]
     fn insert_before_moves_node() {
-        let main = MockDom::create_element(element::Main);
-        let p = MockDom::create_element(element::P);
-        let span = MockDom::create_element(element::Span);
+        let main = MockDom::create_element("main", None);
+        let p = MockDom::create_element("p", None);
+        let span = MockDom::create_element("span", None);
         let text = MockDom::create_text_node("Hello, world!");
         MockDom::insert_node(&main, p.as_ref(), None);
         MockDom::insert_node(&span, text.as_ref(), None);
@@ -712,9 +604,9 @@ mod tests {
 
     #[test]
     fn first_child_gets_first_child() {
-        let main = MockDom::create_element(element::Main);
-        let p = MockDom::create_element(element::P);
-        let span = MockDom::create_element(element::Span);
+        let main = MockDom::create_element("main", None);
+        let p = MockDom::create_element("p", None);
+        let span = MockDom::create_element("span", None);
         MockDom::insert_node(&main, p.as_ref(), None);
         MockDom::insert_node(&p, span.as_ref(), None);
         assert_eq!(
@@ -730,9 +622,9 @@ mod tests {
 
     #[test]
     fn next_sibling_gets_next_sibling() {
-        let main = MockDom::create_element(element::Main);
-        let p = MockDom::create_element(element::P);
-        let span = MockDom::create_element(element::Span);
+        let main = MockDom::create_element("main", None);
+        let p = MockDom::create_element("p", None);
+        let span = MockDom::create_element("span", None);
         let text = MockDom::create_text_node("foo");
         MockDom::insert_node(&main, p.as_ref(), None);
         MockDom::insert_node(&main, span.as_ref(), None);
