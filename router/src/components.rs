@@ -1,3 +1,4 @@
+#[cfg(not(feature = "mock_dom"))]
 pub use super::{form::*, link::*};
 #[cfg(feature = "ssr")]
 use crate::location::RequestUrl;
@@ -6,7 +7,8 @@ use crate::{
     flat_router::FlatRoutesView,
     hooks::{use_matched, use_navigate},
     location::{
-        BrowserUrl, Location, LocationChange, LocationProvider, State, Url,
+        DefaultLocationProvider, Location, LocationChange, LocationProvider,
+        State, Url,
     },
     navigate::NavigateOptions,
     nested_router::NestedRoutesView,
@@ -27,7 +29,6 @@ use std::{
     fmt::{Debug, Display},
     mem,
     sync::Arc,
-    time::Duration,
 };
 
 /// A wrapper that allows passing route definitions as children to a component like [`Routes`],
@@ -83,15 +84,15 @@ where
     #[cfg(not(feature = "ssr"))]
     let (location_provider, current_url, redirect_hook) = {
         let owner = Owner::current();
-        let location =
-            BrowserUrl::new().expect("could not access browser navigation"); // TODO options here
+        let location = DefaultLocationProvider::new()
+            .expect("could not access browser navigation"); // TODO options here
         location.init(base.clone());
         provide_context(location.clone());
         let current_url = location.as_url().clone();
 
         let redirect_hook = Box::new(move |loc: &str| {
             if let Some(owner) = &owner {
-                owner.with(|| BrowserUrl::redirect(loc));
+                owner.with(|| DefaultLocationProvider::redirect(loc));
             }
         });
 
@@ -127,7 +128,7 @@ pub(crate) struct RouterContext {
     pub set_is_routing: Option<SignalSetter<bool>>,
     pub query_mutations:
         ArcStoredValue<Vec<(Oco<'static, str>, Option<String>)>>,
-    pub location_provider: Option<BrowserUrl>,
+    pub location_provider: Option<DefaultLocationProvider>,
 }
 
 impl RouterContext {
@@ -144,7 +145,7 @@ impl RouterContext {
             resolve_path("", path, None)
         };
 
-        let mut url = match BrowserUrl::parse(&resolved_to) {
+        let mut url = match DefaultLocationProvider::parse(&resolved_to) {
             Ok(url) => url,
             Err(e) => {
                 leptos::logging::error!("Error parsing URL: {e:?}");
@@ -169,7 +170,10 @@ impl RouterContext {
         }
 
         if url.origin() != current.origin() {
-            window().location().set_href(path).unwrap();
+            #[cfg(not(feature = "mock_dom"))]
+            {
+                window().location().set_href(path).unwrap();
+            }
             return;
         }
 
@@ -195,6 +199,7 @@ impl RouterContext {
         }
     }
 
+    #[allow(dead_code)] // Used by link.rs which is excluded in mock_dom mode
     pub fn resolve_path<'a>(
         &'a self,
         path: &'a str,
@@ -231,7 +236,7 @@ where
     FallbackFn: FnOnce() -> Fallback + Clone + Send + 'static,
     Fallback: IntoView + 'static,
 {
-    let location = use_context::<BrowserUrl>();
+    let location = use_context::<DefaultLocationProvider>();
     let RouterContext {
         current_url,
         base,
@@ -284,7 +289,7 @@ where
     FallbackFn: FnOnce() -> Fallback + Clone + Send + 'static,
     Fallback: IntoView + 'static,
 {
-    let location = use_context::<BrowserUrl>();
+    let location = use_context::<DefaultLocationProvider>();
     let RouterContext {
         current_url,
         base,
@@ -633,6 +638,7 @@ pub fn provide_server_redirect(handler: impl Fn(&str) + Send + Sync + 'static) {
 /// provide some visual indicator that the page is currently loading
 /// async data, so that it is does not appear to have frozen. It can be
 /// styled independently.
+#[cfg(not(feature = "mock_dom"))]
 #[component]
 pub fn RoutingProgress(
     /// Whether the router is currently loading the new page.

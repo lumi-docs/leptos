@@ -1,7 +1,9 @@
 #![allow(missing_docs)]
 
+#[cfg(not(feature = "mock_dom"))]
 use any_spawner::Executor;
 use core::fmt::Debug;
+#[cfg(not(feature = "mock_dom"))]
 use js_sys::Reflect;
 use leptos::server::ServerActionError;
 use reactive_graph::{
@@ -10,17 +12,37 @@ use reactive_graph::{
     signal::{ArcRwSignal, ReadSignal},
     traits::With,
 };
+#[cfg(not(feature = "mock_dom"))]
 use send_wrapper::SendWrapper;
-use std::{borrow::Cow, future::Future};
+use std::borrow::Cow;
+#[cfg(not(feature = "mock_dom"))]
+use std::future::Future;
+#[cfg(not(feature = "mock_dom"))]
 use tachys::dom::window;
+#[cfg(not(feature = "mock_dom"))]
 use wasm_bindgen::{JsCast, JsValue};
+#[cfg(not(feature = "mock_dom"))]
 use web_sys::{HtmlAnchorElement, MouseEvent};
 
+#[cfg(not(feature = "mock_dom"))]
 mod history;
+#[cfg(feature = "mock_dom")]
+mod mock;
 mod server;
 use crate::params::ParamsMap;
+#[cfg(not(feature = "mock_dom"))]
 pub use history::*;
+#[cfg(feature = "mock_dom")]
+pub use mock::*;
 pub use server::*;
+
+/// The default location provider for the current build configuration.
+/// In browser builds, this is `BrowserUrl`. In mock builds, this is `MockUrl`.
+#[cfg(not(feature = "mock_dom"))]
+pub type DefaultLocationProvider = BrowserUrl;
+
+#[cfg(feature = "mock_dom")]
+pub type DefaultLocationProvider = MockUrl;
 
 pub(crate) const BASE: &str = "https://leptos.dev";
 
@@ -264,9 +286,12 @@ pub trait LocationProvider: Clone + 'static {
     fn is_back(&self) -> ReadSignal<bool>;
 }
 
+// Browser mode: State wraps a JsValue
+#[cfg(not(feature = "mock_dom"))]
 #[derive(Debug, Clone, Default)]
 pub struct State(Option<SendWrapper<JsValue>>);
 
+#[cfg(not(feature = "mock_dom"))]
 impl State {
     pub fn new(state: Option<JsValue>) -> Self {
         Self(state.map(SendWrapper::new))
@@ -280,6 +305,7 @@ impl State {
     }
 }
 
+#[cfg(not(feature = "mock_dom"))]
 impl PartialEq for State {
     fn eq(&self, other: &Self) -> bool {
         self.0.as_ref().map(|n| n.as_ref())
@@ -287,6 +313,7 @@ impl PartialEq for State {
     }
 }
 
+#[cfg(not(feature = "mock_dom"))]
 impl<T> From<T> for State
 where
     T: Into<JsValue>,
@@ -296,6 +323,19 @@ where
     }
 }
 
+// Mock mode: State is a simple empty wrapper (no JsValue available)
+#[cfg(feature = "mock_dom")]
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct State;
+
+#[cfg(feature = "mock_dom")]
+impl State {
+    pub fn new(_state: Option<()>) -> Self {
+        Self
+    }
+}
+
+#[cfg(not(feature = "mock_dom"))]
 pub(crate) fn handle_anchor_click<NavFn, NavFut>(
     router_base: Option<Cow<'static, str>>,
     parse_with_base: fn(&str, &str) -> Result<Url, JsValue>,

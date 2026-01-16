@@ -128,10 +128,12 @@
 pub mod components;
 /// An optimized "flat" router without nested routes.
 pub mod flat_router;
+#[cfg(not(feature = "mock_dom"))]
 mod form;
 mod generate_route_list;
 /// Hooks that can be used to access router state inside your components.
 pub mod hooks;
+#[cfg(not(feature = "mock_dom"))]
 mod link;
 /// Utilities for accessing the current location.
 pub mod location;
@@ -154,6 +156,19 @@ pub use method::*;
 pub use navigate::*;
 pub use ssr_mode::*;
 
+// Mock view_transition module - just runs the callback immediately
+#[cfg(feature = "mock_dom")]
+pub(crate) mod view_transition {
+    pub fn start_view_transition(
+        _level: u8,
+        _is_back_navigation: bool,
+        fun: impl FnOnce() + 'static,
+    ) {
+        fun();
+    }
+}
+
+#[cfg(not(feature = "mock_dom"))]
 pub(crate) mod view_transition {
     use js_sys::{Function, Promise, Reflect};
     use leptos::leptos_dom::helpers::document;

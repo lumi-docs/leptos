@@ -146,6 +146,7 @@ where
 }
 
 #[track_caller]
+#[allow(dead_code)] // Used by form.rs which is excluded in mock_dom mode
 pub(crate) fn has_router() -> bool {
     use_context::<RouterContext>().is_some()
 }
@@ -238,6 +239,7 @@ pub(crate) struct Matched(pub ArcMemo<String>);
 
 /// Resolves the given path relative to the current route.
 #[track_caller]
+#[allow(dead_code)] // Used by form.rs which is excluded in mock_dom mode
 pub(crate) fn use_resolved_path(
     path: impl Fn() -> String + Send + Sync + 'static,
 ) -> ArcMemo<String> {
