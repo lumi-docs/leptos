@@ -2,7 +2,7 @@ use super::{Attribute, NextAttribute};
 use crate::{
     erased::{Erased, ErasedLocal},
     html::attribute::NamedAttributeKey,
-    renderer::{dom::Element, Rndr},
+    renderer::{types::Element, Rndr},
 };
 use std::{any::TypeId, fmt::Debug, mem};
 #[cfg(feature = "ssr")]

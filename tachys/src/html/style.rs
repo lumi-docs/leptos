@@ -8,7 +8,7 @@ use crate::{
     html::attribute::{
         maybe_next_attr_erasure_macros::next_attr_combine, NamedAttributeKey,
     },
-    renderer::{dom::CssStyleDeclaration, Rndr},
+    renderer::{types::CssStyleDeclaration, Rndr},
     view::{Position, ToTemplate},
 };
 use std::{future::Future, sync::Arc};

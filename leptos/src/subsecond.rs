@@ -1,5 +1,8 @@
+#[cfg(not(feature = "mock_dom"))]
 use dioxus_devtools::DevserverMsg;
+#[cfg(not(feature = "mock_dom"))]
 use wasm_bindgen::{prelude::Closure, JsCast};
+#[cfg(not(feature = "mock_dom"))]
 use web_sys::{js_sys::JsString, MessageEvent, WebSocket};
 
 /// Sets up a websocket connect to the `dx` CLI, waiting for incoming hot-patching messages
@@ -10,6 +13,7 @@ use web_sys::{js_sys::JsString, MessageEvent, WebSocket};
 //  Would love to just take a dependency on that to be able to use it and deduplicate.
 //
 //  https://github.com/DioxusLabs/dioxus/blob/main/packages/web/src/devtools.rs#L36
+#[cfg(not(feature = "mock_dom"))]
 pub fn connect_to_hot_patch_messages() {
     // Get the location of the devserver, using the current location plus the /_dioxus path
     // The idea here being that the devserver is always located on the /_dioxus behind a proxy

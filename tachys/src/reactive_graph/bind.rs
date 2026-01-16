@@ -1,5 +1,9 @@
+#[cfg(not(feature = "mock_dom"))]
 use crate::{
     dom::{event_target_checked, event_target_value},
+    html::event::{change, input, on},
+};
+use crate::{
     html::{
         attribute::{
             maybe_next_attr_erasure_macros::{
@@ -8,7 +12,6 @@ use crate::{
             Attribute, AttributeKey, AttributeValue, NamedAttributeKey,
             NextAttribute,
         },
-        event::{change, input, on},
         property::{prop, IntoProperty},
     },
     prelude::AddAnyAttr,
@@ -459,17 +462,28 @@ where
 }
 
 /// Returns self from an event target.
+#[cfg(not(feature = "mock_dom"))]
 pub trait FromEventTarget {
     /// Returns self from an event target.
     fn from_event_target(evt: &web_sys::Event) -> Self;
 }
 
+/// Mock version of `FromEventTarget` for testing.
+/// This trait has no implementations in mock_dom since event binding is browser-specific.
+#[cfg(feature = "mock_dom")]
+pub trait FromEventTarget {
+    /// Returns self from an event target (mock version - not implemented).
+    fn from_event_target(evt: &crate::renderer::types::Event) -> Self;
+}
+
+#[cfg(not(feature = "mock_dom"))]
 impl FromEventTarget for bool {
     fn from_event_target(evt: &web_sys::Event) -> Self {
         event_target_checked(evt)
     }
 }
 
+#[cfg(not(feature = "mock_dom"))]
 impl FromEventTarget for String {
     fn from_event_target(evt: &web_sys::Event) -> Self {
         event_target_value(evt)
@@ -492,6 +506,7 @@ pub trait ChangeEvent {
         Self: Sized;
 }
 
+#[cfg(not(feature = "mock_dom"))]
 impl ChangeEvent for web_sys::Element {
     fn attach_change_event<T, W>(
         &self,
@@ -525,6 +540,22 @@ impl ChangeEvent for web_sys::Element {
     }
 }
 
+#[cfg(feature = "mock_dom")]
+impl ChangeEvent for crate::renderer::mock_dom::Element {
+    fn attach_change_event<T, W>(
+        &self,
+        _key: &str,
+        _write_signal: W,
+    ) -> RemoveEventHandler<Self>
+    where
+        T: FromEventTarget + AttributeValue + 'static,
+        W: Set<Value = T> + 'static,
+    {
+        // No-op for mock DOM - event listeners are browser-specific
+        RemoveEventHandler::new(|| {})
+    }
+}
+
 /// Get the value attribute of an element (input).
 /// Reads `value` if `T` is `String` and `checked` if `T` is `bool`.
 pub trait GetValue<T> {
@@ -532,15 +563,33 @@ pub trait GetValue<T> {
     fn get_value(&self) -> T;
 }
 
+#[cfg(not(feature = "mock_dom"))]
 impl GetValue<String> for web_sys::Element {
     fn get_value(&self) -> String {
         self.get_attribute("value").unwrap_or_default()
     }
 }
 
+#[cfg(not(feature = "mock_dom"))]
 impl GetValue<bool> for web_sys::Element {
     fn get_value(&self) -> bool {
         self.get_attribute("checked").unwrap_or_default() == "true"
+    }
+}
+
+#[cfg(feature = "mock_dom")]
+impl GetValue<String> for crate::renderer::mock_dom::Element {
+    fn get_value(&self) -> String {
+        // Mock implementation - return empty string
+        String::new()
+    }
+}
+
+#[cfg(feature = "mock_dom")]
+impl GetValue<bool> for crate::renderer::mock_dom::Element {
+    fn get_value(&self) -> bool {
+        // Mock implementation - return false
+        false
     }
 }
 

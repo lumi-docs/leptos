@@ -4,7 +4,7 @@ use crate::{
     no_attrs,
     prelude::{AddAnyAttr, Mountable},
     renderer::{
-        dom::{Element, Node},
+        types::{Element, Node},
         CastFrom, Rndr,
     },
     view::{Position, PositionState, Render, RenderHtml},

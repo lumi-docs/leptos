@@ -3,10 +3,12 @@
 //! See [`Renderer`](crate::renderer::Renderer) and [`Rndr`](crate::renderer::Rndr) for additional information.
 
 use super::{CastFrom, RemoveEventHandler};
+#[cfg(not(feature = "mock_dom"))]
+use crate::view::Mountable;
 use crate::{
     dom::{document, window},
     ok_or_debug, or_debug,
-    view::{Mountable, ToTemplate},
+    view::ToTemplate,
 };
 use linear_map::LinearMap;
 use rustc_hash::FxHashSet;
@@ -222,6 +224,7 @@ impl Dom {
     ///
     /// ## Panics
     /// The default implementation panics if `before` does not have a parent [`crate::renderer::types::Element`].
+    #[cfg(not(feature = "mock_dom"))]
     pub fn mount_before<M>(new_child: &mut M, before: &Node)
     where
         M: Mountable,
@@ -236,6 +239,7 @@ impl Dom {
     /// Tries to mount the new child before the marker as its sibling.
     ///
     /// Returns `false` if the child did not have a valid parent.
+    #[cfg(not(feature = "mock_dom"))]
     #[track_caller]
     pub fn try_mount_before<M>(new_child: &mut M, before: &Node) -> bool
     where
@@ -612,6 +616,7 @@ impl Dom {
     }
 }
 
+#[cfg(not(feature = "mock_dom"))]
 impl Mountable for Node {
     fn unmount(&mut self) {
         todo!()
@@ -639,6 +644,7 @@ impl Mountable for Node {
     }
 }
 
+#[cfg(not(feature = "mock_dom"))]
 impl Mountable for Text {
     fn unmount(&mut self) {
         self.remove();
@@ -667,6 +673,7 @@ impl Mountable for Text {
     }
 }
 
+#[cfg(not(feature = "mock_dom"))]
 impl Mountable for Comment {
     fn unmount(&mut self) {
         self.remove();
@@ -695,6 +702,7 @@ impl Mountable for Comment {
     }
 }
 
+#[cfg(not(feature = "mock_dom"))]
 impl Mountable for Element {
     fn unmount(&mut self) {
         self.remove();

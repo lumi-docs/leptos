@@ -1,13 +1,15 @@
 use crate::{
-    renderer::{CastFrom, Rndr},
+    renderer::{
+        types::{Element, Node, Placeholder, Text},
+        CastFrom, Rndr,
+    },
     view::{Position, PositionState},
 };
 #[cfg(any(debug_assertions, leptos_debuginfo))]
 use std::cell::Cell;
 use std::{cell::RefCell, panic::Location, rc::Rc};
-use web_sys::{Comment, Element, Node, Text};
 
-#[cfg(feature = "mark_branches")]
+#[cfg(all(feature = "mark_branches", not(feature = "mock_dom")))]
 const COMMENT_NODE: u16 = 8;
 
 /// Hydration works by walking over the DOM, adding interactivity as needed.
@@ -51,7 +53,7 @@ where
             *inner = node;
         }
 
-        #[cfg(feature = "mark_branches")]
+        #[cfg(all(feature = "mark_branches", not(feature = "mock_dom")))]
         {
             while inner.node_type() == COMMENT_NODE {
                 if let Some(content) = inner.text_content() {
@@ -80,7 +82,7 @@ where
             *inner = node;
         }
 
-        #[cfg(feature = "mark_branches")]
+        #[cfg(all(feature = "mark_branches", not(feature = "mock_dom")))]
         {
             while inner.node_type() == COMMENT_NODE {
                 if let Some(content) = inner.text_content() {
@@ -156,6 +158,7 @@ pub(crate) fn set_currently_hydrating(
     }
 }
 
+#[cfg(not(feature = "mock_dom"))]
 pub(crate) fn failed_to_cast_element(tag_name: &str, node: Node) -> Element {
     #[cfg(not(any(debug_assertions, leptos_debuginfo)))]
     {
@@ -188,7 +191,15 @@ pub(crate) fn failed_to_cast_element(tag_name: &str, node: Node) -> Element {
     }
 }
 
-pub(crate) fn failed_to_cast_marker_node(node: Node) -> Comment {
+#[cfg(feature = "mock_dom")]
+pub(crate) fn failed_to_cast_element(tag_name: &str, _node: Node) -> Element {
+    panic!(
+        "Hydration error: expected <{tag_name}> element but found different node type"
+    );
+}
+
+#[cfg(not(feature = "mock_dom"))]
+pub(crate) fn failed_to_cast_marker_node(node: Node) -> Placeholder {
     #[cfg(not(any(debug_assertions, leptos_debuginfo)))]
     {
         _ = node;
@@ -220,6 +231,14 @@ pub(crate) fn failed_to_cast_marker_node(node: Node) -> Comment {
     }
 }
 
+#[cfg(feature = "mock_dom")]
+pub(crate) fn failed_to_cast_marker_node(_node: Node) -> Placeholder {
+    panic!(
+        "Hydration error: expected marker node but found different node type"
+    );
+}
+
+#[cfg(not(feature = "mock_dom"))]
 pub(crate) fn failed_to_cast_text_node(node: Node) -> Text {
     #[cfg(not(any(debug_assertions, leptos_debuginfo)))]
     {
@@ -250,4 +269,9 @@ pub(crate) fn failed_to_cast_text_node(node: Node) -> Text {
              directly above this for more details."
         );
     }
+}
+
+#[cfg(feature = "mock_dom")]
+pub(crate) fn failed_to_cast_text_node(_node: Node) -> Text {
+    panic!("Hydration error: expected text node but found different node type");
 }

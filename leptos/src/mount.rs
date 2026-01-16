@@ -1,14 +1,14 @@
-#[cfg(debug_assertions)]
+#[cfg(all(debug_assertions, not(feature = "mock_dom")))]
 use crate::logging;
+#[cfg(not(feature = "mock_dom"))]
 use crate::IntoView;
 use any_spawner::Executor;
 use reactive_graph::owner::Owner;
 #[cfg(debug_assertions)]
 use std::cell::Cell;
-use tachys::{
-    dom::body,
-    view::{Mountable, Render},
-};
+#[cfg(not(feature = "mock_dom"))]
+use tachys::dom::body;
+use tachys::view::{Mountable, Render};
 #[cfg(feature = "hydrate")]
 use tachys::{
     hydration::Cursor,
@@ -16,6 +16,7 @@ use tachys::{
 };
 #[cfg(feature = "hydrate")]
 use wasm_bindgen::JsCast;
+#[cfg(not(feature = "mock_dom"))]
 use web_sys::HtmlElement;
 
 #[cfg(feature = "hydrate")]
@@ -162,6 +163,7 @@ where
 }
 
 /// Runs the provided closure and mounts the result to the `<body>`.
+#[cfg(not(feature = "mock_dom"))]
 pub fn mount_to_body<F, N>(f: F)
 where
     F: FnOnce() -> N + 'static,
@@ -171,7 +173,23 @@ where
     owner.forget();
 }
 
+/// Runs the provided closure and mounts the result to a mock "body" element.
+///
+/// This is the mock_dom version which creates a mock body element and mounts to it.
+#[cfg(feature = "mock_dom")]
+pub fn mount_to_body<F, N>(f: F)
+where
+    F: FnOnce() -> N + 'static,
+    N: Render,
+{
+    use tachys::renderer::mock_dom::MockDom;
+    let body = MockDom::create_element("body", None);
+    let owner = mount_to_renderer(&body, f);
+    owner.forget();
+}
+
 /// Runs the provided closure and mounts the result to the provided element.
+#[cfg(not(feature = "mock_dom"))]
 pub fn mount_to<F, N>(parent: HtmlElement, f: F) -> UnmountHandle<N::State>
 where
     F: FnOnce() -> N + 'static,
@@ -224,7 +242,14 @@ where
     // use wasm-bindgen-futures to drive the reactive system
     // we ignore the return value because an Err here just means the wasm-bindgen executor is
     // already initialized, which is not an issue
-    _ = Executor::init_wasm_bindgen();
+    #[cfg(not(feature = "mock_dom"))]
+    {
+        _ = Executor::init_wasm_bindgen();
+    }
+    #[cfg(feature = "mock_dom")]
+    {
+        _ = Executor::init_futures_executor();
+    }
 
     // create a new reactive owner and use it as the root node to run the app
     let owner = Owner::new();

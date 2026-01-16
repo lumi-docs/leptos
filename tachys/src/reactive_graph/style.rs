@@ -24,7 +24,7 @@ where
 
     fn build(
         mut self,
-        style: &crate::renderer::dom::CssStyleDeclaration,
+        style: &crate::renderer::types::CssStyleDeclaration,
         name: &str,
     ) -> Self::State {
         let name: Arc<str> = Rndr::intern(name).into();
@@ -45,7 +45,7 @@ where
 
     fn rebuild(
         mut self,
-        style: &crate::renderer::dom::CssStyleDeclaration,
+        style: &crate::renderer::types::CssStyleDeclaration,
         name: &str,
         state: &mut Self::State,
     ) {
@@ -77,7 +77,7 @@ where
 
     fn hydrate(
         mut self,
-        style: &crate::renderer::dom::CssStyleDeclaration,
+        style: &crate::renderer::types::CssStyleDeclaration,
         name: &str,
     ) -> Self::State {
         let name: Arc<str> = Rndr::intern(name).into();
@@ -290,7 +290,7 @@ macro_rules! style_reactive {
 
             fn build(
                 self,
-                style: &crate::renderer::dom::CssStyleDeclaration,
+                style: &crate::renderer::types::CssStyleDeclaration,
                 name: &str,
             ) -> Self::State {
                 IntoStyleValue::build(move || self.get(), style, name)
@@ -298,7 +298,7 @@ macro_rules! style_reactive {
 
             fn rebuild(
                 self,
-                style: &crate::renderer::dom::CssStyleDeclaration,
+                style: &crate::renderer::types::CssStyleDeclaration,
                 name: &str,
                 state: &mut Self::State,
             ) {
@@ -312,7 +312,7 @@ macro_rules! style_reactive {
 
             fn hydrate(
                 self,
-                style: &crate::renderer::dom::CssStyleDeclaration,
+                style: &crate::renderer::types::CssStyleDeclaration,
                 name: &str,
             ) -> Self::State {
                 IntoStyleValue::hydrate(move || self.get(), style, name)

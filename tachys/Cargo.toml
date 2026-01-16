@@ -162,6 +162,7 @@ sledgehammer_utils = { optional = true, workspace = true, default-features = tru
 tracing = { optional = true, workspace = true, default-features = true }
 serde = { optional = true, workspace = true, default-features = true }
 serde_json = { optional = true, workspace = true, default-features = true }
+lightningcss = { optional = true, workspace = true, default-features = true }
 
 [dev-dependencies]
 tokio-test = { workspace = true, default-features = true }
@@ -183,7 +184,8 @@ ssr = []
 oco = ["dep:oco_ref"]
 nightly = ["reactive_graph/nightly"]
 testing = ["dep:slotmap"]
-mock_dom = ["testing"]  # enables mock DOM renderer for component snapshot testing
+css_cascade = ["dep:lightningcss"]  # enables CSS cascade resolution for computed styles
+mock_dom = ["testing", "dep:any_spawner", "any_spawner/futures-executor", "css_cascade"]  # enables mock DOM renderer for component snapshot testing
 reactive_graph = ["dep:reactive_graph", "dep:any_spawner"]
 reactive_stores = ["reactive_graph", "dep:reactive_stores"]
 sledgehammer = ["dep:sledgehammer_bindgen", "dep:sledgehammer_utils"]

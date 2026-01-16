@@ -63,6 +63,7 @@ rustc_version = { workspace = true, default-features = true }
 tracing = ["dep:tracing"]
 ssr = ["dep:percent-encoding"]
 nightly = []
+mock_dom = []
 
 [package.metadata.docs.rs]
 all-features = true
@@ -77,4 +78,5 @@ unexpected_cfgs = { level = "warn", check-cfg = [
   'cfg(leptos_debuginfo)',
   'cfg(erase_components)',
   'cfg(rustc_nightly)',
+  'cfg(feature, values("mock_dom"))',
 ] }

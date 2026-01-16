@@ -6,7 +6,7 @@ use crate::{
     hydration::Cursor,
     prelude::{AddAnyAttr, Mountable},
     renderer::{
-        dom::{Element, Node},
+        types::{Element, Node},
         CastFrom, Rndr,
     },
     view::{Position, PositionState, Render, RenderHtml},

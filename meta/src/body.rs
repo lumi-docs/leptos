@@ -60,6 +60,7 @@ where
     attributes: At::State,
 }
 
+#[cfg(not(feature = "mock_dom"))]
 impl<At> Render for BodyView<At>
 where
     At: Attribute,
@@ -68,6 +69,26 @@ where
 
     fn build(self) -> Self::State {
         let el = document().body().expect("there to be a <body> element");
+        let attributes = self.attributes.build(&el);
+
+        BodyViewState { attributes }
+    }
+
+    fn rebuild(self, state: &mut Self::State) {
+        self.attributes.rebuild(&mut state.attributes);
+    }
+}
+
+#[cfg(feature = "mock_dom")]
+impl<At> Render for BodyView<At>
+where
+    At: Attribute,
+{
+    type State = BodyViewState<At>;
+
+    fn build(self) -> Self::State {
+        use leptos::tachys::renderer::mock_dom::MockDom;
+        let el = MockDom::create_element("body", None);
         let attributes = self.attributes.build(&el);
 
         BodyViewState { attributes }
@@ -98,6 +119,7 @@ where
     }
 }
 
+#[cfg(not(feature = "mock_dom"))]
 impl<At> RenderHtml for BodyView<At>
 where
     At: Attribute,
@@ -155,6 +177,66 @@ where
     }
 }
 
+#[cfg(feature = "mock_dom")]
+impl<At> RenderHtml for BodyView<At>
+where
+    At: Attribute,
+{
+    type AsyncOutput = BodyView<At::AsyncOutput>;
+    type Owned = BodyView<At::CloneableOwned>;
+
+    const MIN_LENGTH: usize = At::MIN_LENGTH;
+
+    fn dry_resolve(&mut self) {
+        self.attributes.dry_resolve();
+    }
+
+    async fn resolve(self) -> Self::AsyncOutput {
+        BodyView {
+            attributes: self.attributes.resolve().await,
+        }
+    }
+
+    fn to_html_with_buf(
+        self,
+        _buf: &mut String,
+        _position: &mut Position,
+        _escape: bool,
+        _mark_branches: bool,
+        extra_attrs: Vec<AnyAttribute>,
+    ) {
+        if let Some(meta) = use_context::<ServerMetaContext>() {
+            let mut buf = String::new();
+            _ = html::attributes_to_html(
+                (self.attributes, extra_attrs),
+                &mut buf,
+            );
+            if !buf.is_empty() {
+                _ = meta.body.send(buf);
+            }
+        }
+    }
+
+    fn hydrate<const FROM_SERVER: bool>(
+        self,
+        _cursor: &Cursor,
+        _position: &PositionState,
+    ) -> Self::State {
+        use leptos::tachys::renderer::mock_dom::MockDom;
+        let el = MockDom::create_element("body", None);
+        let attributes = self.attributes.hydrate::<FROM_SERVER>(&el);
+
+        BodyViewState { attributes }
+    }
+
+    fn into_owned(self) -> Self::Owned {
+        BodyView {
+            attributes: self.attributes.into_cloneable_owned(),
+        }
+    }
+}
+
+#[cfg(not(feature = "mock_dom"))]
 impl<At> Mountable for BodyViewState<At>
 where
     At: Attribute,
@@ -177,5 +259,29 @@ where
             .body()
             .expect("there to be a <body> element")
             .into()]
+    }
+}
+
+#[cfg(feature = "mock_dom")]
+impl<At> Mountable for BodyViewState<At>
+where
+    At: Attribute,
+{
+    fn unmount(&mut self) {}
+
+    fn mount(
+        &mut self,
+        _parent: &leptos::tachys::renderer::types::Element,
+        _marker: Option<&leptos::tachys::renderer::types::Node>,
+    ) {
+    }
+
+    fn insert_before_this(&self, _child: &mut dyn Mountable) -> bool {
+        false
+    }
+
+    fn elements(&self) -> Vec<leptos::tachys::renderer::types::Element> {
+        use leptos::tachys::renderer::mock_dom::MockDom;
+        vec![MockDom::create_element("body", None)]
     }
 }

@@ -28,13 +28,32 @@ pub mod mock_dom;
 /// future, so to the extent possible the rest of the crate tries to stick to using
 /// [`Renderer`].
 /// methods rather than directly manipulating the DOM inline.
+#[cfg(not(feature = "mock_dom"))]
 pub type Rndr = dom::Dom;
+
+/// The renderer being used for the application (mock DOM variant).
+///
+/// See the non-mock version for additional information on this rendering approach.
+#[cfg(feature = "mock_dom")]
+pub type Rndr = mock_dom::MockDom;
 
 /// Types used by the renderer.
 ///
 /// See [`Rndr`] for additional information on this rendering approach.
+#[cfg(not(feature = "mock_dom"))]
 pub mod types {
     pub use super::dom::{
+        ClassList, CssStyleDeclaration, Element, Event, Node, Placeholder,
+        TemplateElement, Text,
+    };
+}
+
+/// Types used by the renderer (mock DOM variant).
+///
+/// See [`Rndr`] for additional information on this rendering approach.
+#[cfg(feature = "mock_dom")]
+pub mod types {
+    pub use super::mock_dom::{
         ClassList, CssStyleDeclaration, Element, Event, Node, Placeholder,
         TemplateElement, Text,
     };

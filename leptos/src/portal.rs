@@ -1,7 +1,12 @@
+#[cfg(not(feature = "mock_dom"))]
 use crate::{children::TypedChildrenFn, mount, IntoView};
+#[cfg(not(feature = "mock_dom"))]
 use leptos_dom::helpers::document;
+#[cfg(not(feature = "mock_dom"))]
 use leptos_macro::component;
+#[cfg(not(feature = "mock_dom"))]
 use reactive_graph::{effect::Effect, graph::untrack, owner::Owner};
+#[cfg(not(feature = "mock_dom"))]
 use std::sync::Arc;
 
 /// Renders components somewhere else in the DOM.
@@ -10,6 +15,7 @@ use std::sync::Arc;
 /// If no mount point is given, the portal is inserted in `document.body`;
 /// it is wrapped in a `<div>` unless  `is_svg` is `true` in which case it's wrapped in a `<g>`.
 /// Setting `use_shadow` to `true` places the element in a shadow root to isolate styles.
+#[cfg(not(feature = "mock_dom"))]
 #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip_all))]
 #[component]
 pub fn Portal<V>(

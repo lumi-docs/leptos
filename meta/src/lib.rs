@@ -71,7 +71,9 @@ use std::{
         Arc, LazyLock,
     },
 };
+#[cfg(not(feature = "mock_dom"))]
 use wasm_bindgen::JsCast;
+#[cfg(not(feature = "mock_dom"))]
 use web_sys::HtmlHeadElement;
 
 mod body;
@@ -113,8 +115,10 @@ impl MetaContext {
 pub(crate) const HEAD_MARKER_COMMENT: &str = "HEAD";
 /// Return value of [`Node::node_type`] for a comment.
 /// https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeType#node.comment_node
+#[cfg(not(feature = "mock_dom"))]
 const COMMENT_NODE: u16 = 8;
 
+#[cfg(not(feature = "mock_dom"))]
 impl Default for MetaContext {
     fn default() -> Self {
         let build_cursor: fn() -> SendWrapper<Cursor> = || {
@@ -140,6 +144,26 @@ impl Default for MetaContext {
                     )
                     .unchecked_into(),
             ))
+        };
+
+        let cursor = Arc::new(LazyLock::new(build_cursor));
+        Self {
+            title: Default::default(),
+            cursor,
+        }
+    }
+}
+
+#[cfg(feature = "mock_dom")]
+impl Default for MetaContext {
+    fn default() -> Self {
+        // In mock_dom mode, we create a placeholder cursor that won't actually be used
+        // since we're not interacting with a real DOM
+        let build_cursor: fn() -> SendWrapper<Cursor> = || {
+            // Create a mock element for the cursor
+            use leptos::tachys::renderer::mock_dom::MockDom;
+            let el = MockDom::create_element("head", None);
+            SendWrapper::new(Cursor::new(el))
         };
 
         let cursor = Arc::new(LazyLock::new(build_cursor));
@@ -353,6 +377,7 @@ where
     }
 }
 
+#[cfg(not(feature = "mock_dom"))]
 fn document_head() -> HtmlHeadElement {
     let document = document();
     document.head().unwrap_or_else(|| {
@@ -361,6 +386,12 @@ fn document_head() -> HtmlHeadElement {
         _ = document.append_child(&el);
         el.unchecked_into()
     })
+}
+
+#[cfg(feature = "mock_dom")]
+fn document_head() -> leptos::tachys::renderer::mock_dom::Element {
+    use leptos::tachys::renderer::mock_dom::MockDom;
+    MockDom::create_element("head", None)
 }
 
 impl<E, At, Ch> Render for RegisteredMetaTag<E, At, Ch>

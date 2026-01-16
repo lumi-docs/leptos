@@ -166,14 +166,18 @@ pub mod prelude {
     // In the future, maybe we should remove this blanket export
     // However, it is definitely useful relative to looking up every struct etc.
     mod export_types {
+        #[cfg(not(feature = "mock_dom"))]
+        pub use crate::form::*;
+        #[cfg(feature = "mock_dom")]
+        pub use crate::mock_helpers::*;
         #[cfg(feature = "nonce")]
         pub use crate::nonce::*;
         pub use crate::{
             callback::*, children::*, component::*, control_flow::*, error::*,
-            form::*, hydration::*, into_view::*, mount::*, suspense::*,
-            text_prop::*,
+            hydration::*, into_view::*, mount::*, suspense::*, text_prop::*,
         };
         pub use leptos_config::*;
+        #[cfg(not(feature = "mock_dom"))]
         pub use leptos_dom::helpers::*;
         pub use leptos_macro::*;
         pub use leptos_server::*;
@@ -201,6 +205,10 @@ pub mod prelude {
 
 /// Components used for working with HTML forms, like `<ActionForm>`.
 pub mod form;
+
+/// Mock-compatible helper functions for use with mock_dom testing.
+#[cfg(feature = "mock_dom")]
+pub mod mock_helpers;
 
 /// A standard way to wrap functions and closures to pass them to components.
 pub use reactive_graph::callback;

@@ -395,6 +395,7 @@ where
         }
         position.set(Position::NextChild);
 
+        #[cfg(not(feature = "mock_dom"))]
         if let Some(on_hydrate) = self.on_hydrate {
             use crate::{
                 hydration::failed_to_cast_element, renderer::CastFrom,
@@ -417,6 +418,8 @@ where
                 &cb.into_js_value(),
             );
         }
+        #[cfg(feature = "mock_dom")]
+        let _ = self.on_hydrate;
     }
 
     fn into_owned(self) -> Self::Owned {

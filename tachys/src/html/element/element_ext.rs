@@ -5,10 +5,8 @@ use crate::{
         event::{on, EventDescriptor},
         style::IntoStyle,
     },
-    renderer::RemoveEventHandler,
+    renderer::{types::Element, RemoveEventHandler},
 };
-use wasm_bindgen::JsValue;
-use web_sys::Element;
 
 /// Extends an HTML element, allowing you to add attributes and children to the
 /// element's built state at runtime, with a similar API to how they
@@ -52,7 +50,7 @@ pub trait ElementExt {
     where
         E: EventDescriptor + Send + 'static,
         E::EventType: 'static,
-        E::EventType: From<JsValue>;
+        E::EventType: From<crate::renderer::types::Event>;
 }
 
 impl<T> ElementExt for T
@@ -81,7 +79,7 @@ where
     where
         E: EventDescriptor + Send + 'static,
         E::EventType: 'static,
-        E::EventType: From<JsValue>,
+        E::EventType: From<crate::renderer::types::Event>,
     {
         on::<E, _>(ev, cb).attach(self.as_ref())
     }

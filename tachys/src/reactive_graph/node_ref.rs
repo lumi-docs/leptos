@@ -83,6 +83,7 @@ where
 {
 }
 
+#[cfg(not(feature = "mock_dom"))]
 impl<E> NodeRefContainer<E> for NodeRef<E>
 where
     E: ElementType,
@@ -93,6 +94,17 @@ where
         // so it will always be accessed or dropped from the main thread
         self.0
             .set(Some(SendWrapper::new(el.clone().unchecked_into())));
+    }
+}
+
+#[cfg(feature = "mock_dom")]
+impl<E> NodeRefContainer<E> for NodeRef<E>
+where
+    E: ElementType,
+    E::Output: From<crate::renderer::types::Element> + 'static,
+{
+    fn load(self, el: &crate::renderer::types::Element) {
+        self.0.set(Some(SendWrapper::new(el.clone().into())));
     }
 }
 

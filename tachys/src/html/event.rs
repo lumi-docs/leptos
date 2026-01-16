@@ -538,7 +538,8 @@ macro_rules! generate_event_types {
         pub struct [<$( $event )+ >];
 
         impl EventDescriptor for [< $($event)+ >] {
-          type EventType = web_sys::$web_event;
+          // Use conditionally-exported types (web_sys or mock_dom)
+          type EventType = $web_event;
 
           #[inline(always)]
           fn name(&self) -> Cow<'static, str> {
@@ -768,15 +769,28 @@ generate_event_types! {
   visibility change: Event,
 }
 
-// Export `web_sys` event types
+// Export event types (web_sys or mock_dom depending on feature)
 use super::{
     attribute::{
         maybe_next_attr_erasure_macros::next_attr_output_type, NextAttribute,
     },
     element::HasElementType,
 };
+
+#[cfg(not(feature = "mock_dom"))]
 #[doc(no_inline)]
 pub use web_sys::{
+    AnimationEvent, BeforeUnloadEvent, ClipboardEvent, CompositionEvent,
+    CustomEvent, DeviceMotionEvent, DeviceOrientationEvent, DragEvent,
+    ErrorEvent, Event, FocusEvent, GamepadEvent, HashChangeEvent, InputEvent,
+    KeyboardEvent, MessageEvent, MouseEvent, PageTransitionEvent, PointerEvent,
+    PopStateEvent, ProgressEvent, PromiseRejectionEvent,
+    SecurityPolicyViolationEvent, StorageEvent, SubmitEvent, TouchEvent,
+    TransitionEvent, UiEvent, WheelEvent,
+};
+
+#[cfg(feature = "mock_dom")]
+pub use crate::renderer::mock_dom::events::{
     AnimationEvent, BeforeUnloadEvent, ClipboardEvent, CompositionEvent,
     CustomEvent, DeviceMotionEvent, DeviceOrientationEvent, DragEvent,
     ErrorEvent, Event, FocusEvent, GamepadEvent, HashChangeEvent, InputEvent,

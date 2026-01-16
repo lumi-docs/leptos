@@ -1,7 +1,12 @@
+#[cfg(not(feature = "mock_dom"))]
 use crate::{children::Children, component, prelude::*, IntoView};
+#[cfg(not(feature = "mock_dom"))]
 use leptos_dom::helpers::window;
+#[cfg(not(feature = "mock_dom"))]
 use leptos_server::{ServerAction, ServerMultiAction};
+#[cfg(not(feature = "mock_dom"))]
 use serde::de::DeserializeOwned;
+#[cfg(not(feature = "mock_dom"))]
 use server_fn::{
     client::Client,
     codec::PostUrl,
@@ -9,6 +14,7 @@ use server_fn::{
     request::ClientReq,
     Http, ServerFn,
 };
+#[cfg(not(feature = "mock_dom"))]
 use tachys::{
     either::Either,
     html::{
@@ -17,8 +23,11 @@ use tachys::{
     },
     reactive_graph::node_ref::NodeRef,
 };
+#[cfg(not(feature = "mock_dom"))]
 use thiserror::Error;
+#[cfg(not(feature = "mock_dom"))]
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
+#[cfg(not(feature = "mock_dom"))]
 use web_sys::{
     Event, FormData, HtmlButtonElement, HtmlFormElement, HtmlInputElement,
     SubmitEvent,
@@ -73,6 +82,7 @@ use web_sys::{
 ///     Ok(())
 /// }
 /// ```
+#[cfg(not(feature = "mock_dom"))]
 #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip_all))]
 #[component]
 pub fn ActionForm<ServFn, OutputProtocol>(
@@ -151,6 +161,7 @@ where
 /// Automatically turns a server [MultiAction](leptos_server::MultiAction) into an HTML
 /// [`form`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form)
 /// progressively enhanced to use client-side routing.
+#[cfg(not(feature = "mock_dom"))]
 #[component]
 pub fn MultiActionForm<ServFn, OutputProtocol>(
     /// The action from which to build the form.
@@ -216,6 +227,7 @@ where
 }
 
 /// Resolves a redirect location to an (absolute) URL.
+#[cfg(not(feature = "mock_dom"))]
 pub(crate) fn resolve_redirect_url(loc: &str) -> Option<web_sys::Url> {
     let origin = match window().location().origin() {
         Ok(origin) => origin,
@@ -242,6 +254,7 @@ pub(crate) fn resolve_redirect_url(loc: &str) -> Option<web_sys::Url> {
 
 /// Tries to deserialize a type from form data. This can be used for client-side
 /// validation during form submission.
+#[cfg(not(feature = "mock_dom"))]
 pub trait FromFormData
 where
     Self: Sized + serde::de::DeserializeOwned,
@@ -256,6 +269,7 @@ where
 }
 
 /// Errors that can arise when converting from an HTML event or form into a Rust data type.
+#[cfg(not(feature = "mock_dom"))]
 #[derive(Error, Debug)]
 pub enum FromFormDataError {
     /// Could not find a `<form>` connected to the event.
@@ -269,6 +283,7 @@ pub enum FromFormDataError {
     Deserialization(serde_qs::Error),
 }
 
+#[cfg(not(feature = "mock_dom"))]
 impl<T> FromFormData for T
 where
     T: serde::de::DeserializeOwned,
@@ -291,6 +306,7 @@ where
     }
 }
 
+#[cfg(not(feature = "mock_dom"))]
 fn form_data_from_event(
     ev: &SubmitEvent,
 ) -> Result<FormData, FromFormDataError> {

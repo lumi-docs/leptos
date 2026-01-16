@@ -1,5 +1,6 @@
 //! Utilities for simple isomorphic logging to the console or terminal.
 
+#[cfg(not(feature = "mock_dom"))]
 use wasm_bindgen::JsValue;
 
 /// Uses `println!()`-style formatting to log something to the console (in the browser)
@@ -42,10 +43,11 @@ macro_rules! debug_warn {
 }
 
 const fn log_to_stdout() -> bool {
-    cfg!(not(all(
-        target_arch = "wasm32",
-        not(any(target_os = "emscripten", target_os = "wasi"))
-    )))
+    cfg!(feature = "mock_dom")
+        || cfg!(not(all(
+            target_arch = "wasm32",
+            not(any(target_os = "emscripten", target_os = "wasi"))
+        )))
 }
 
 /// Log a string to the console (in the browser)
@@ -55,6 +57,7 @@ pub fn console_log(s: &str) {
     if log_to_stdout() {
         println!("{s}");
     } else {
+        #[cfg(not(feature = "mock_dom"))]
         web_sys::console::log_1(&JsValue::from_str(s));
     }
 }
@@ -65,6 +68,7 @@ pub fn console_warn(s: &str) {
     if log_to_stdout() {
         eprintln!("{s}");
     } else {
+        #[cfg(not(feature = "mock_dom"))]
         web_sys::console::warn_1(&JsValue::from_str(s));
     }
 }
@@ -76,6 +80,7 @@ pub fn console_error(s: &str) {
     if log_to_stdout() {
         eprintln!("{s}");
     } else {
+        #[cfg(not(feature = "mock_dom"))]
         web_sys::console::error_1(&JsValue::from_str(s));
     }
 }
@@ -89,6 +94,7 @@ pub fn console_debug_warn(s: &str) {
         if log_to_stdout() {
             eprintln!("{s}");
         } else {
+            #[cfg(not(feature = "mock_dom"))]
             web_sys::console::warn_1(&JsValue::from_str(s));
         }
     }
@@ -98,5 +104,3 @@ pub fn console_debug_warn(s: &str) {
         let _ = s;
     }
 }
-
-

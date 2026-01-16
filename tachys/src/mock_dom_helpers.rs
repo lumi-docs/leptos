@@ -1,0 +1,107 @@
+//! Mock DOM helper functions for mock_dom mode.
+//!
+//! These provide stub implementations of browser-specific DOM functions.
+
+use crate::renderer::mock_dom::{Element, MockDom};
+
+/// Returns a mock window.
+pub fn window() -> MockWindow {
+    MockWindow
+}
+
+/// Returns a mock document.
+pub fn document() -> MockDocument {
+    MockDocument
+}
+
+/// Returns a mock body element.
+pub fn body() -> Element {
+    MockDom::create_element("body", None)
+}
+
+/// Mock window type.
+#[derive(Clone, Debug)]
+pub struct MockWindow;
+
+impl MockWindow {
+    /// Returns a mock location.
+    pub fn location(&self) -> MockLocation {
+        MockLocation
+    }
+}
+
+/// Mock document type.
+#[derive(Clone, Debug)]
+pub struct MockDocument;
+
+impl MockDocument {
+    /// Returns a mock head element.
+    pub fn head(&self) -> Option<Element> {
+        Some(MockDom::create_element("head", None))
+    }
+
+    /// Returns a mock body element.
+    pub fn body(&self) -> Option<Element> {
+        Some(MockDom::create_element("body", None))
+    }
+
+    /// Returns a mock document element.
+    pub fn document_element(&self) -> Option<Element> {
+        Some(MockDom::create_element("html", None))
+    }
+
+    /// Gets element by ID (always returns None in mock mode).
+    pub fn get_element_by_id(&self, _id: &str) -> Option<Element> {
+        None
+    }
+}
+
+/// Mock location type.
+#[derive(Clone, Debug)]
+pub struct MockLocation;
+
+#[allow(clippy::result_unit_err)]
+impl MockLocation {
+    /// Returns empty hash.
+    pub fn hash(&self) -> Result<String, ()> {
+        Ok(String::new())
+    }
+
+    /// Returns root pathname.
+    pub fn pathname(&self) -> Result<String, ()> {
+        Ok(String::from("/"))
+    }
+
+    /// Returns localhost origin.
+    pub fn origin(&self) -> Result<String, ()> {
+        Ok(String::from("http://localhost"))
+    }
+
+    /// Returns localhost href.
+    pub fn href(&self) -> Result<String, ()> {
+        Ok(String::from("http://localhost/"))
+    }
+
+    /// Sets href (no-op).
+    pub fn set_href(&self, _href: &str) -> Result<(), ()> {
+        Ok(())
+    }
+}
+
+/// Helper function to extract event target (stub).
+pub fn event_target<T>(_event: &crate::renderer::mock_dom::Event) -> T
+where
+    T: Default,
+{
+    T::default()
+}
+
+/// Helper function to extract event target value (stub).
+pub fn event_target_value<T>(_event: &T) -> String {
+    String::new()
+}
+
+/// Helper function to extract event target checked (stub).
+pub fn event_target_checked(_ev: &crate::renderer::mock_dom::Event) -> bool {
+    false
+}

@@ -32,6 +32,7 @@ default = []
 tracing = ["dep:tracing"]
 trace-component-props = ["dep:serde", "dep:serde_json"]
 hydration = ["reactive_graph/hydration"]
+mock_dom = []
 
 [package.metadata.docs.rs]
 all-features = true
@@ -42,4 +43,4 @@ denylist = ["tracing"]
 max_combination_size = 2
 
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(leptos_debuginfo)'] }
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(leptos_debuginfo)', 'cfg(feature, values("mock_dom"))'] }

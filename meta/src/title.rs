@@ -60,6 +60,7 @@ impl TitleContext {
                 move |_| {
                     revalidate.track();
                     let text = this.as_string();
+                    #[cfg(not(feature = "mock_dom"))]
                     document().set_title(text.as_deref().unwrap_or_default());
                     text
                 }

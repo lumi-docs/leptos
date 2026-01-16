@@ -48,12 +48,16 @@ use web_sys::Node;
 
 /// Helpers for interacting with the DOM.
 pub mod dom;
+
 /// Types for building a statically-typed HTML view tree.
 pub mod html;
 /// Supports adding interactivity to HTML.
 pub mod hydration;
 /// Types for MathML.
 pub mod mathml;
+/// Mock DOM helpers for testing (available alongside regular dom).
+#[cfg(feature = "mock_dom")]
+pub mod mock_dom_helpers;
 /// Defines various backends that can render views.
 pub mod renderer;
 /// Rendering views to HTML.

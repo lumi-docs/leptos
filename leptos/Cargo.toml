@@ -64,6 +64,7 @@ dioxus-cli-config = { workspace = true, default-features = true, optional = true
 dioxus-devtools = { workspace = true, default-features = true, optional = true }
 
 [features]
+mock_dom = ["tachys/mock_dom", "leptos_dom/mock_dom"]
 hydration = [
   "reactive_graph/hydration",
   "leptos_server/hydration",
