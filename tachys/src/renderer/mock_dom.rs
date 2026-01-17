@@ -3642,6 +3642,13 @@ pub mod events {
         }
     }
 
+    /// Allows Element to be converted into HtmlElement via JsCast::dyn_into
+    impl From<super::Element> for HtmlElement {
+        fn from(element: super::Element) -> Self {
+            HtmlElement(element.0)
+        }
+    }
+
     impl HtmlElement {
         /// Get the left offset position of the element.
         /// In mock mode, reads from `data-mock-offset-left` attribute or returns 0.
