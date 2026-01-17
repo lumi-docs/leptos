@@ -6,13 +6,15 @@ use crate::renderer::mock_dom::events::{FromEventTarget, JsValue};
 use crate::renderer::mock_dom::{Document, Element, MockDom};
 
 /// Returns a mock window.
-pub fn window() -> MockWindow {
-    MockWindow
+/// Returns Some to match the real web_sys::window() signature.
+pub fn window() -> Option<MockWindow> {
+    Some(MockWindow)
 }
 
 /// Returns a mock document.
-pub fn document() -> MockDocument {
-    MockDocument
+/// Returns Some to match the pattern for optional browser APIs.
+pub fn document() -> Option<MockDocument> {
+    Some(MockDocument)
 }
 
 /// Returns a mock body element.
