@@ -1,3 +1,5 @@
+#[cfg(feature = "mock_dom")]
+pub use super::mock_link::*;
 #[cfg(not(feature = "mock_dom"))]
 pub use super::{form::*, link::*};
 #[cfg(feature = "ssr")]

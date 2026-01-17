@@ -139,6 +139,8 @@ mod link;
 pub mod location;
 mod matching;
 mod method;
+#[cfg(feature = "mock_dom")]
+mod mock_link;
 mod navigate;
 /// A nested router that supports multiple levels of route definitions.
 pub mod nested_router;
