@@ -321,6 +321,14 @@ impl Element {
             snapshot_node(node, self, buf, indent);
         });
     }
+
+    /// Attempt to borrow this element as a specific type (e.g., HtmlElement).
+    ///
+    /// In mock mode, returns an owned value rather than a reference.
+    /// This shadows the JsCast trait method for Elements.
+    pub fn dyn_ref<T: events::FromElement>(&self) -> Option<T> {
+        T::from_element(self)
+    }
 }
 
 /// HTML void elements that should not have a closing tag.
@@ -692,6 +700,26 @@ impl Document {
             parent: None,
             ty: NodeType::Placeholder,
         })))
+    }
+
+    /// Query for an element matching the given CSS selector.
+    ///
+    /// Returns the first element that matches, or None if no match found.
+    /// Uses the selector parsing infrastructure from the testing module.
+    pub fn query_selector(selector: &str) -> Option<Element> {
+        DOCUMENT.with(|d| {
+            let data = d.0.borrow();
+            // Iterate through all nodes and find matching elements
+            for (id, node) in data.iter() {
+                if matches!(&node.ty, NodeType::Element { .. }) {
+                    let element = Element(Node(id));
+                    if testing::matches_selector(&element, selector) {
+                        return Some(element);
+                    }
+                }
+            }
+            None
+        })
     }
 }
 
@@ -3525,6 +3553,13 @@ pub mod events {
         fn from_event_target(target: EventTarget) -> Result<Self, EventTarget>;
     }
 
+    /// Trait for types that can be converted from Element in mock mode.
+    /// This allows dyn_ref to work for Element -> HtmlElement conversions.
+    pub trait FromElement: Sized {
+        /// Convert from Element. In mock mode this always succeeds.
+        fn from_element(element: &super::Element) -> Option<Self>;
+    }
+
     // ========== HtmlInputElement ==========
     /// Mock HtmlInputElement
     #[derive(Clone, Debug)]
@@ -3599,6 +3634,89 @@ pub mod events {
             Ok(HtmlElement(target.0))
         }
     }
+
+    impl FromElement for HtmlElement {
+        fn from_element(element: &super::Element) -> Option<Self> {
+            // In mock mode, any Element can be treated as HtmlElement
+            Some(HtmlElement(element.0.clone()))
+        }
+    }
+
+    impl HtmlElement {
+        /// Get the left offset position of the element.
+        /// In mock mode, reads from `data-mock-offset-left` attribute or returns 0.
+        pub fn offset_left(&self) -> i32 {
+            Document::with_node(self.0 .0, |node| {
+                if let NodeType::Element { attrs, .. } = &node.ty {
+                    attrs
+                        .get("data-mock-offset-left")
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(0)
+                } else {
+                    0
+                }
+            })
+            .unwrap_or(0)
+        }
+
+        /// Get the width of the element.
+        /// In mock mode, reads from `data-mock-offset-width` attribute or returns 100.
+        pub fn offset_width(&self) -> i32 {
+            Document::with_node(self.0 .0, |node| {
+                if let NodeType::Element { attrs, .. } = &node.ty {
+                    attrs
+                        .get("data-mock-offset-width")
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(100)
+                } else {
+                    100
+                }
+            })
+            .unwrap_or(100)
+        }
+
+        /// Get the top offset position of the element.
+        /// In mock mode, reads from `data-mock-offset-top` attribute or returns 0.
+        pub fn offset_top(&self) -> i32 {
+            Document::with_node(self.0 .0, |node| {
+                if let NodeType::Element { attrs, .. } = &node.ty {
+                    attrs
+                        .get("data-mock-offset-top")
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(0)
+                } else {
+                    0
+                }
+            })
+            .unwrap_or(0)
+        }
+
+        /// Get the height of the element.
+        /// In mock mode, reads from `data-mock-offset-height` attribute or returns 100.
+        pub fn offset_height(&self) -> i32 {
+            Document::with_node(self.0 .0, |node| {
+                if let NodeType::Element { attrs, .. } = &node.ty {
+                    attrs
+                        .get("data-mock-offset-height")
+                        .and_then(|v| v.parse().ok())
+                        .unwrap_or(100)
+                } else {
+                    100
+                }
+            })
+            .unwrap_or(100)
+        }
+
+        /// Focus the element.
+        /// In mock mode, this is a no-op that always succeeds.
+        pub fn focus(&self) -> Result<(), JsValue> {
+            Ok(())
+        }
+    }
+
+    /// Mock JsValue type for error returns.
+    #[derive(Clone, Debug)]
+    pub struct JsValue;
 
     // ========== FileList ==========
     /// Mock FileList (empty in mock mode)

@@ -426,9 +426,13 @@ pub mod wasm_bindgen {
 /// These types mirror the web_sys API for testing purposes.
 #[cfg(feature = "mock_dom")]
 pub mod web_sys {
-    pub use tachys::renderer::mock_dom::events::{
-        EventTarget, File, FileList, HtmlElement, HtmlInputElement,
+    pub use tachys::mock_dom_helpers::{
+        window, MockDocument as Document, MockWindow as Window,
     };
+    pub use tachys::renderer::mock_dom::events::{
+        EventTarget, File, FileList, HtmlElement, HtmlInputElement, JsValue,
+    };
+    pub use tachys::renderer::mock_dom::Element;
 }
 
 #[doc(hidden)]

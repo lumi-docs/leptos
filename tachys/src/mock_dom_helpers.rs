@@ -2,8 +2,8 @@
 //!
 //! These provide stub implementations of browser-specific DOM functions.
 
-use crate::renderer::mock_dom::events::FromEventTarget;
-use crate::renderer::mock_dom::{Element, MockDom};
+use crate::renderer::mock_dom::events::{FromEventTarget, JsValue};
+use crate::renderer::mock_dom::{Document, Element, MockDom};
 
 /// Returns a mock window.
 pub fn window() -> MockWindow {
@@ -28,6 +28,11 @@ impl MockWindow {
     /// Returns a mock location.
     pub fn location(&self) -> MockLocation {
         MockLocation
+    }
+
+    /// Returns a mock document.
+    pub fn document(&self) -> Option<MockDocument> {
+        Some(MockDocument)
     }
 }
 
@@ -54,6 +59,17 @@ impl MockDocument {
     /// Gets element by ID (always returns None in mock mode).
     pub fn get_element_by_id(&self, _id: &str) -> Option<Element> {
         None
+    }
+
+    /// Query for an element matching the given CSS selector.
+    ///
+    /// Returns the first element that matches the selector.
+    /// Mirrors the web_sys::Document::query_selector API.
+    pub fn query_selector(
+        &self,
+        selector: &str,
+    ) -> Result<Option<Element>, JsValue> {
+        Ok(Document::query_selector(selector))
     }
 }
 
