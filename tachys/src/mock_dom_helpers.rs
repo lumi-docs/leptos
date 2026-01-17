@@ -2,6 +2,7 @@
 //!
 //! These provide stub implementations of browser-specific DOM functions.
 
+use crate::renderer::mock_dom::events::FromEventTarget;
 use crate::renderer::mock_dom::{Element, MockDom};
 
 /// Returns a mock window.
@@ -88,12 +89,16 @@ impl MockLocation {
     }
 }
 
-/// Helper function to extract event target (stub).
-pub fn event_target<T>(_event: &crate::renderer::mock_dom::Event) -> T
+/// Helper function to extract event target.
+/// Returns the event target cast to the specified element type.
+pub fn event_target<T>(event: &crate::renderer::mock_dom::events::Event) -> T
 where
-    T: Default,
+    T: crate::renderer::mock_dom::events::FromEventTarget,
 {
-    T::default()
+    event
+        .target()
+        .and_then(|t| T::from_event_target(t).ok())
+        .expect("event_target: event had no target or wrong element type")
 }
 
 /// Helper function to extract event target value (stub).
@@ -101,7 +106,14 @@ pub fn event_target_value<T>(_event: &T) -> String {
     String::new()
 }
 
-/// Helper function to extract event target checked (stub).
-pub fn event_target_checked(_ev: &crate::renderer::mock_dom::Event) -> bool {
-    false
+/// Helper function to extract event target checked.
+/// Returns the checked state of an input element.
+pub fn event_target_checked(
+    ev: &crate::renderer::mock_dom::events::Event,
+) -> bool {
+    use crate::renderer::mock_dom::events::HtmlInputElement;
+    ev.target()
+        .and_then(|t| HtmlInputElement::from_event_target(t).ok())
+        .map(|input: HtmlInputElement| input.checked())
+        .unwrap_or(false)
 }
