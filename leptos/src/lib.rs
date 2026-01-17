@@ -371,12 +371,65 @@ pub use serde_json;
 #[cfg(feature = "tracing")]
 #[doc(hidden)]
 pub use tracing;
+#[cfg(not(feature = "mock_dom"))]
 #[doc(hidden)]
 pub use wasm_bindgen;
 #[doc(hidden)]
 pub use wasm_split_helpers as wasm_split;
+#[cfg(not(feature = "mock_dom"))]
 #[doc(hidden)]
 pub use web_sys;
+
+/// Mock wasm_bindgen types for mock_dom feature.
+#[cfg(feature = "mock_dom")]
+pub mod wasm_bindgen {
+    /// Mock JsCast trait for type conversions in mock mode.
+    pub trait JsCast: Sized {
+        /// Check if this value is an instance of the given type.
+        fn has_type<T>(&self) -> bool {
+            true // In mock mode, we assume all casts succeed
+        }
+
+        /// Attempt a dynamic cast.
+        fn dyn_into<T>(self) -> Result<T, Self>
+        where
+            Self: Into<T>,
+        {
+            Ok(self.into())
+        }
+
+        /// Unchecked cast.
+        fn unchecked_into<T>(self) -> T
+        where
+            Self: Into<T>,
+        {
+            self.into()
+        }
+
+        /// Attempt a dynamic reference cast.
+        fn dyn_ref<T>(&self) -> Option<&T> {
+            None // Reference casts not supported in mock
+        }
+
+        /// Unchecked reference cast.
+        fn unchecked_ref<T>(&self) -> &T {
+            panic!("unchecked_ref not supported in mock mode")
+        }
+    }
+
+    // Implement JsCast for mock types
+    impl JsCast for tachys::renderer::mock_dom::events::EventTarget {}
+    impl JsCast for tachys::renderer::mock_dom::Element {}
+}
+
+/// Mock web_sys types for mock_dom feature.
+/// These types mirror the web_sys API for testing purposes.
+#[cfg(feature = "mock_dom")]
+pub mod web_sys {
+    pub use tachys::renderer::mock_dom::events::{
+        EventTarget, File, FileList, HtmlElement, HtmlInputElement,
+    };
+}
 
 #[doc(hidden)]
 pub mod __reexports {
