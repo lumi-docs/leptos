@@ -52,3 +52,50 @@ where
         Box::new(self)
     }
 }
+
+use leptos::children::Children;
+use leptos::oco::Oco;
+use leptos::prelude::*;
+use reactive_graph::computed::ArcMemo;
+
+/// Mock A component for testing - renders as a simple <a> element.
+///
+/// This is a simplified version of the real A component that doesn't
+/// require browser APIs. It renders an anchor tag with the href but
+/// doesn't do client-side navigation or active link detection.
+#[component]
+pub fn A<H>(
+    /// Used to calculate the link's `href` attribute.
+    href: H,
+    /// Where to display the linked URL.
+    #[prop(optional, into)]
+    target: Option<Oco<'static, str>>,
+    /// If `true`, the link is marked active when the location matches exactly.
+    #[prop(optional)]
+    exact: bool,
+    /// If `true`, and when `href` has a trailing slash, `aria-current` will only be set
+    /// if `current_url` also has a trailing slash.
+    #[prop(optional)]
+    strict_trailing_slash: bool,
+    /// If `true`, the router will scroll to the top of the window at the end of navigation.
+    #[prop(default = true)]
+    scroll: bool,
+    /// The nodes or elements to be shown inside the link.
+    children: Children,
+) -> impl IntoView
+where
+    H: ToHref + Send + Sync + 'static,
+{
+    // Suppress unused variable warnings for props we don't use in mock mode
+    let _ = (exact, strict_trailing_slash, scroll);
+
+    // Get the initial href string - in mock mode we don't need reactive path resolution
+    let href_string = href.to_href()();
+    let href_memo = ArcMemo::new(move |_| href_string.clone());
+
+    view! {
+        <a href=move || href_memo.get() target=target>
+            {children()}
+        </a>
+    }
+}

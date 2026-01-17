@@ -3487,11 +3487,158 @@ impl Mountable for Placeholder {
 #[allow(missing_docs)]
 pub mod events {
     use super::{
-        MockAnimationData, MockEvent, MockFocusData, MockKeyboardData,
-        MockMouseData, MockTouchData, MockTransitionData, MockWheelData,
+        Document, MockAnimationData, MockEvent, MockFocusData,
+        MockKeyboardData, MockMouseData, MockTouchData, MockTransitionData,
+        MockWheelData, Node, NodeType,
     };
     use wasm_bindgen::convert::FromWasmAbi;
     use wasm_bindgen::describe::WasmDescribe;
+
+    // ========== EventTarget ==========
+    /// Mock EventTarget - represents the target of an event.
+    /// Can be cast to specific element types using dyn_into.
+    #[derive(Clone, Debug)]
+    pub struct EventTarget(pub(crate) Node);
+
+    impl EventTarget {
+        /// Attempt to cast this target to a specific element type.
+        /// In mock mode, this succeeds for any element type.
+        pub fn dyn_into<T: FromEventTarget>(self) -> Result<T, Self> {
+            T::from_event_target(self)
+        }
+
+        /// Unchecked cast to a specific type.
+        pub fn unchecked_into<T: FromEventTarget>(self) -> T {
+            T::from_event_target(self).expect("unchecked_into failed")
+        }
+
+        /// Get a reference and attempt to cast.
+        pub fn dyn_ref<T: FromEventTarget>(&self) -> Option<T> {
+            T::from_event_target(self.clone()).ok()
+        }
+    }
+
+    /// Trait for types that can be converted from EventTarget in mock mode.
+    /// This allows dyn_into to work without conflicting with std TryFrom.
+    pub trait FromEventTarget: Sized {
+        /// Convert from EventTarget. In mock mode this always succeeds.
+        fn from_event_target(target: EventTarget) -> Result<Self, EventTarget>;
+    }
+
+    // ========== HtmlInputElement ==========
+    /// Mock HtmlInputElement
+    #[derive(Clone, Debug)]
+    pub struct HtmlInputElement(pub(crate) Node);
+
+    impl HtmlInputElement {
+        /// Get the input value
+        pub fn value(&self) -> String {
+            Document::with_node(self.0 .0, |node| {
+                if let NodeType::Element { attrs, .. } = &node.ty {
+                    attrs.get("value").cloned().unwrap_or_default()
+                } else {
+                    String::new()
+                }
+            })
+            .unwrap_or_default()
+        }
+
+        /// Set the input value
+        pub fn set_value(&self, value: &str) {
+            Document::with_node_mut(self.0 .0, |node| {
+                if let NodeType::Element { attrs, .. } = &mut node.ty {
+                    attrs.insert("value".to_string(), value.to_string());
+                }
+            });
+        }
+
+        /// Get files (returns None in mock mode)
+        pub fn files(&self) -> Option<FileList> {
+            None
+        }
+
+        /// Check if this element is checked (for checkboxes/radios)
+        pub fn checked(&self) -> bool {
+            Document::with_node(self.0 .0, |node| {
+                if let NodeType::Element { attrs, .. } = &node.ty {
+                    attrs.get("checked").map(|v| v == "true").unwrap_or(false)
+                } else {
+                    false
+                }
+            })
+            .unwrap_or(false)
+        }
+
+        /// Set the checked state
+        pub fn set_checked(&self, value: bool) {
+            Document::with_node_mut(self.0 .0, |node| {
+                if let NodeType::Element { attrs, .. } = &mut node.ty {
+                    if value {
+                        attrs.insert("checked".to_string(), "true".to_string());
+                    } else {
+                        attrs.shift_remove("checked");
+                    }
+                }
+            });
+        }
+    }
+
+    impl FromEventTarget for HtmlInputElement {
+        fn from_event_target(target: EventTarget) -> Result<Self, EventTarget> {
+            Ok(HtmlInputElement(target.0))
+        }
+    }
+
+    // ========== HtmlElement ==========
+    /// Mock HtmlElement (generic)
+    #[derive(Clone, Debug)]
+    pub struct HtmlElement(pub(crate) Node);
+
+    impl FromEventTarget for HtmlElement {
+        fn from_event_target(target: EventTarget) -> Result<Self, EventTarget> {
+            Ok(HtmlElement(target.0))
+        }
+    }
+
+    // ========== FileList ==========
+    /// Mock FileList (empty in mock mode)
+    #[derive(Clone, Debug)]
+    pub struct FileList;
+
+    impl FileList {
+        /// Returns the number of files (always 0 in mock)
+        pub fn length(&self) -> u32 {
+            0
+        }
+        /// Get file by index (always None in mock)
+        pub fn item(&self, _index: u32) -> Option<File> {
+            None
+        }
+        /// Get file by index (always None in mock)
+        pub fn get(&self, _index: u32) -> Option<File> {
+            None
+        }
+    }
+
+    // ========== File ==========
+    /// Mock File
+    #[derive(Clone, Debug)]
+    pub struct File;
+
+    impl File {
+        /// Get the file name (empty in mock)
+        pub fn name(&self) -> String {
+            String::new()
+        }
+        /// Get the file size (0 in mock)
+        pub fn size(&self) -> f64 {
+            0.0
+        }
+        /// Get the file type (empty in mock)
+        pub fn type_(&self) -> String {
+            String::new()
+        }
+    }
 
     // Helper macro to implement common event methods
     macro_rules! impl_event_common {
@@ -3524,6 +3671,11 @@ pub mod events {
                         .current_target
                         .get()
                         .map(|id| super::Element(super::Node(id)))
+                }
+
+                /// Returns the target element (the element that originally dispatched the event).
+                pub fn target(&self) -> Option<EventTarget> {
+                    self.0.target.map(|id| EventTarget(super::Node(id)))
                 }
 
                 /// Returns the event phase (0=None, 1=Capturing, 2=AtTarget, 3=Bubbling).
