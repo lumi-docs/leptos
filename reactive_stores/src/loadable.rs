@@ -292,34 +292,34 @@ where
         self.inner.track_field();
     }
 
-    /// Match on the loadable state with closures.
+    /// Get the current loading state for pattern matching.
     ///
-    /// This is the primary way to reactively render based on loading state.
+    /// This is reactive - it tracks the field.
     ///
     /// # Example
     ///
     /// ```rust,ignore
-    /// state.profile().with(
-    ///     || view! { "Not loaded yet" },
-    ///     || view! { <Spinner /> },
-    ///     |profile| view! { <ProfileCard data=profile.clone() /> },
-    ///     |error| view! { <ErrorBanner message=error.to_string() /> },
-    /// )
+    /// match state.profile().state() {
+    ///     Loadable::NotStarted => view! { "Not loaded yet" },
+    ///     Loadable::Loading => view! { <Spinner /> },
+    ///     Loadable::Ready(ref profile) => view! { <ProfileCard data=profile.clone() /> },
+    ///     Loadable::Failed(ref err) => view! { "Error: " {err.to_string()} },
+    /// }
     /// ```
-    pub fn with<R>(
-        &self,
-        not_started: impl FnOnce() -> R,
-        loading: impl FnOnce() -> R,
-        ready: impl FnOnce(&T) -> R,
-        failed: impl FnOnce(&E) -> R,
-    ) -> R {
+    pub fn state(&self) -> Loadable<T, E> {
         self.inner.track_field();
-        match self.inner.reader().as_deref() {
-            Some(Loadable::NotStarted) | None => not_started(),
-            Some(Loadable::Loading) => loading(),
-            Some(Loadable::Ready(v)) => ready(v),
-            Some(Loadable::Failed(e)) => failed(e),
-        }
+        self.inner
+            .reader()
+            .map(|r| (*r).clone())
+            .unwrap_or(Loadable::NotStarted)
+    }
+
+    /// Get the current loading state without tracking.
+    pub fn state_untracked(&self) -> Loadable<T, E> {
+        self.inner
+            .reader()
+            .map(|r| (*r).clone())
+            .unwrap_or(Loadable::NotStarted)
     }
 
     /// Update the ready value if currently ready, otherwise do nothing.

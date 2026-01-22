@@ -207,15 +207,13 @@ enum SubfieldMode {
     /// Loadable field (async loading state): `#[store(loadable)]`
     /// The field type should be `Loadable<T, E>`
     Loadable,
-    /// Loadable + Keyed: `#[store(loadable(ErrorType), key: Type = |item| item.id)]`
+    /// Loadable + Keyed: `#[store(loadable, key: Type = |item| item.id)]`
     /// Combines loading state with keyed collection.
-    /// The field type should be the collection type (e.g., `Vec<T>`).
-    /// The macro will auto-generate a `{field}_state: Loadable<(), E>` field.
-    /// The error type must be explicitly provided in parentheses after `loadable`.
+    /// The field type should be `Loadable<Collection, Error>` (e.g., `Loadable<Vec<T>, ApiError>`).
+    /// The error type is extracted from the field type.
     LoadableKeyed {
         keyed_by: Box<ExprClosure>,
         key_ty: Box<Type>,
-        error_ty: Box<Type>,
     },
 }
 
@@ -237,15 +235,9 @@ impl Parse for SubfieldMode {
             let expr: Expr = input.parse()?;
             Ok(SubfieldMode::Derived(Box::new(expr)))
         } else if mode == "loadable" {
-            // #[store(loadable)] or #[store(loadable(ErrorType), key: Type = ...)]
-            // Check for parenthesized error type (required for loadable+key)
-            if input.peek(syn::token::Paren) {
-                // Parse error type: loadable(ErrorType)
-                let content;
-                syn::parenthesized!(content in input);
-                let error_ty: Type = content.parse()?;
-
-                // Must be followed by comma and key
+            // #[store(loadable)] or #[store(loadable, key: Type = ...)]
+            // Check for comma followed by key
+            if input.peek(Token![,]) {
                 let _comma: Token![,] = input.parse()?;
                 let key_mode: Ident = input.parse()?;
                 if key_mode == "key" {
@@ -256,10 +248,9 @@ impl Parse for SubfieldMode {
                     Ok(SubfieldMode::LoadableKeyed {
                         keyed_by: Box::new(keyed_by),
                         key_ty: Box::new(key_ty),
-                        error_ty: Box::new(error_ty),
                     })
                 } else {
-                    Err(input.error("expected `key` after `loadable(ErrorType),`"))
+                    Err(input.error("expected `key` after `loadable,`"))
                 }
             } else {
                 Ok(SubfieldMode::Loadable)
@@ -355,20 +346,12 @@ impl ModelTy {
                             attr.meta.path().is_ident("store").then(|| {
                                 match &attr.meta {
                                     Meta::List(list) => {
-                                        match Punctuated::<
-                                                SubfieldMode,
-                                                Comma,
-                                            >::parse_terminated
-                                                .parse2(list.tokens.clone())
-                                            {
-                                                Ok(modes) => Some(
-                                                    modes
-                                                        .iter()
-                                                        .cloned()
-                                                        .collect::<Vec<_>>(),
-                                                ),
-                                                Err(e) => abort!(list, e),
-                                            }
+                                        // Parse the entire attribute content as a single SubfieldMode
+                                        // This handles combined modes like `loadable, key: ...`
+                                        match syn::parse2::<SubfieldMode>(list.tokens.clone()) {
+                                            Ok(mode) => Some(vec![mode]),
+                                            Err(e) => abort!(list, e),
+                                        }
                                     }
                                     _ => None,
                                 }
@@ -550,8 +533,8 @@ fn field_to_tokens(
                                 let inner = #library_path::Subfield::new(
                                     self,
                                     #idx.into(),
-                                    |prev| &prev.#locator,
-                                    |prev| &mut prev.#locator,
+                                    |prev: &#name #clear_generics| &prev.#locator,
+                                    |prev: &mut #name #clear_generics| &mut prev.#locator,
                                 );
                                 #library_path::LoadableSubfield::new(inner)
                             }
@@ -562,42 +545,48 @@ fn field_to_tokens(
                 }
 
                 // Loadable + Keyed: combines loading state with keyed collection
+                // Field type must be Loadable<Collection, Error>
                 SubfieldMode::LoadableKeyed {
                     keyed_by,
                     key_ty,
-                    error_ty,
                 } => {
-                    // For loadable keyed, we expect there to be a companion `{field}_state` field
-                    // IMMEDIATELY BEFORE this field in the struct, of type `Loadable<(), E>`.
-                    // The accessor returns LoadableKeyedSubfield combining both.
-                    let state_locator =
-                        Ident::new(&format!("{}_state", locator), Span::call_site());
+                    // Extract collection type T and error type E from Loadable<T, E>
+                    let type_args = extract_type_args(ty).unwrap_or_else(|| {
+                        abort!(
+                            ty,
+                            "#[store(loadable, key: ...)] field must have type Loadable<Collection, Error>"
+                        )
+                    });
+                    if type_args.len() != 2 {
+                        abort!(
+                            ty,
+                            "#[store(loadable, key: ...)] field must have type Loadable<T, E> with exactly 2 type arguments"
+                        );
+                    }
+                    let collection_ty = type_args[0];
+                    let error_ty = type_args[1];
+
                     let signature = quote! {
                         #[track_caller]
                         fn #ident(self) -> #library_path::LoadableKeyedSubfield<
-                            #any_store_field, #any_store_field, #name #clear_generics, #key_ty, #ty, #error_ty
+                            #any_store_field, #name #clear_generics, #key_ty, #collection_ty, #error_ty
                         >
                     };
-                    // State field is at idx-1 (immediately before this field)
-                    // Data field is at idx (this field)
-                    let state_idx = idx.saturating_sub(1);
                     return if include_body {
                         quote! {
                             #signature {
-                                let state = #library_path::Subfield::new(
-                                    self.clone(),
-                                    (#state_idx).into(),  // State field at idx-1
-                                    |prev| &prev.#state_locator,
-                                    |prev| &mut prev.#state_locator,
-                                );
-                                let data = #library_path::KeyedSubfield::new(
+                                // Create a Subfield wrapping the entire Loadable<T, E>
+                                let inner = #library_path::Subfield::new(
                                     self,
-                                    (#idx).into(),  // Data field at idx
-                                    #keyed_by,
-                                    |prev| &prev.#locator,
-                                    |prev| &mut prev.#locator,
+                                    #idx.into(),
+                                    |prev: &#name #clear_generics| &prev.#locator,
+                                    |prev: &mut #name #clear_generics| &mut prev.#locator,
                                 );
-                                #library_path::LoadableKeyedSubfield::new(state, data)
+                                #library_path::LoadableKeyedSubfield::new(
+                                    inner,
+                                    #idx.into(),  // path segment for keyed access
+                                    #keyed_by,
+                                )
                             }
                         }
                     } else {
