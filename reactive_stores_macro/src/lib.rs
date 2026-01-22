@@ -6,9 +6,31 @@ use syn::{
     parse::{Parse, ParseStream, Parser},
     punctuated::Punctuated,
     token::Comma,
-    Expr, ExprClosure, Field, Fields, GenericParam, Generics, Ident, Index,
-    Meta, Result, Token, Type, TypeParam, Variant, Visibility, WhereClause,
+    Expr, ExprClosure, Field, Fields, GenericParam, GenericArgument, Generics, Ident, Index,
+    Meta, PathArguments, Result, Token, Type, TypeParam, TypePath, Variant, Visibility, WhereClause,
 };
+
+/// Extracts type arguments from a generic type like `Loadable<T, E>`.
+/// Returns the inner types as a Vec if the type matches the expected pattern.
+fn extract_type_args(ty: &Type) -> Option<Vec<&Type>> {
+    if let Type::Path(TypePath { path, .. }) = ty {
+        if let Some(segment) = path.segments.last() {
+            if let PathArguments::AngleBracketed(args) = &segment.arguments {
+                let types: Vec<&Type> = args.args.iter().filter_map(|arg| {
+                    if let GenericArgument::Type(t) = arg {
+                        Some(t)
+                    } else {
+                        None
+                    }
+                }).collect();
+                if !types.is_empty() {
+                    return Some(types);
+                }
+            }
+        }
+    }
+    None
+}
 
 #[proc_macro_error]
 #[proc_macro_derive(Store, attributes(store))]
@@ -500,10 +522,27 @@ fn field_to_tokens(
                 }
 
                 // Loadable field (non-keyed): field type is Loadable<T, E>
+                // Extract T and E from the field type
                 SubfieldMode::Loadable => {
+                    // Extract T and E from Loadable<T, E>
+                    let type_args = extract_type_args(ty).unwrap_or_else(|| {
+                        abort!(
+                            ty,
+                            "#[store(loadable)] field must have type Loadable<T, E>"
+                        )
+                    });
+                    if type_args.len() != 2 {
+                        abort!(
+                            ty,
+                            "#[store(loadable)] field must have type Loadable<T, E> with exactly 2 type arguments"
+                        );
+                    }
+                    let inner_ty = type_args[0];
+                    let error_ty = type_args[1];
+
                     let signature = quote! {
                         #[track_caller]
-                        fn #ident(self) -> #library_path::LoadableSubfield<#any_store_field, #name #clear_generics, #ty>
+                        fn #ident(self) -> #library_path::LoadableSubfield<#any_store_field, #name #clear_generics, #inner_ty, #error_ty>
                     };
                     return if include_body {
                         quote! {
