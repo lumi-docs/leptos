@@ -185,11 +185,16 @@ enum SubfieldMode {
     /// Loadable field (async loading state): `#[store(loadable)]`
     /// The field type should be `Loadable<T, E>`
     Loadable,
-    /// Loadable + Keyed: `#[store(loadable, key: Type = |item| item.id)]`
+    /// Loadable + Keyed: `#[store(loadable(ErrorType), key: Type = |item| item.id)]`
     /// Combines loading state with keyed collection.
     /// The field type should be the collection type (e.g., `Vec<T>`).
     /// The macro will auto-generate a `{field}_state: Loadable<(), E>` field.
-    LoadableKeyed(Box<ExprClosure>, Box<Type>),
+    /// The error type must be explicitly provided in parentheses after `loadable`.
+    LoadableKeyed {
+        keyed_by: Box<ExprClosure>,
+        key_ty: Box<Type>,
+        error_ty: Box<Type>,
+    },
 }
 
 impl Parse for SubfieldMode {
@@ -210,22 +215,29 @@ impl Parse for SubfieldMode {
             let expr: Expr = input.parse()?;
             Ok(SubfieldMode::Derived(Box::new(expr)))
         } else if mode == "loadable" {
-            // #[store(loadable)] or #[store(loadable, key: Type = ...)]
-            // Check if followed by comma and key
-            if input.peek(Token![,]) {
+            // #[store(loadable)] or #[store(loadable(ErrorType), key: Type = ...)]
+            // Check for parenthesized error type (required for loadable+key)
+            if input.peek(syn::token::Paren) {
+                // Parse error type: loadable(ErrorType)
+                let content;
+                syn::parenthesized!(content in input);
+                let error_ty: Type = content.parse()?;
+
+                // Must be followed by comma and key
                 let _comma: Token![,] = input.parse()?;
                 let key_mode: Ident = input.parse()?;
                 if key_mode == "key" {
                     let _col: Token![:] = input.parse()?;
-                    let ty: Type = input.parse()?;
+                    let key_ty: Type = input.parse()?;
                     let _eq: Token![=] = input.parse()?;
-                    let closure: ExprClosure = input.parse()?;
-                    Ok(SubfieldMode::LoadableKeyed(
-                        Box::new(closure),
-                        Box::new(ty),
-                    ))
+                    let keyed_by: ExprClosure = input.parse()?;
+                    Ok(SubfieldMode::LoadableKeyed {
+                        keyed_by: Box::new(keyed_by),
+                        key_ty: Box::new(key_ty),
+                        error_ty: Box::new(error_ty),
+                    })
                 } else {
-                    Err(input.error("expected `key` after `loadable,`"))
+                    Err(input.error("expected `key` after `loadable(ErrorType),`"))
                 }
             } else {
                 Ok(SubfieldMode::Loadable)
@@ -511,7 +523,11 @@ fn field_to_tokens(
                 }
 
                 // Loadable + Keyed: combines loading state with keyed collection
-                SubfieldMode::LoadableKeyed(keyed_by, key_ty) => {
+                SubfieldMode::LoadableKeyed {
+                    keyed_by,
+                    key_ty,
+                    error_ty,
+                } => {
                     // For loadable keyed, we expect there to be a companion `{field}_state` field
                     // in the struct of type `Loadable<(), E>`.
                     // The accessor returns LoadableKeyedSubfield combining both.
@@ -520,7 +536,7 @@ fn field_to_tokens(
                     let signature = quote! {
                         #[track_caller]
                         fn #ident(self) -> #library_path::LoadableKeyedSubfield<
-                            #any_store_field, #any_store_field, #name #clear_generics, #key_ty, #ty
+                            #any_store_field, #any_store_field, #name #clear_generics, #key_ty, #ty, #error_ty
                         >
                     };
                     return if include_body {
