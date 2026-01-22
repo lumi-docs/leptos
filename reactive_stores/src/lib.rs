@@ -263,10 +263,13 @@ use std::{
 
 mod arc_field;
 mod deref;
+mod derived;
 mod field;
 mod iter;
 mod keyed;
 mod len;
+mod loadable;
+mod loadable_keyed;
 mod option;
 mod patch;
 mod path;
@@ -275,10 +278,13 @@ mod subfield;
 
 pub use arc_field::ArcField;
 pub use deref::*;
+pub use derived::{DerivedField, DerivedReader, NeverWriter};
 pub use field::Field;
 pub use iter::*;
 pub use keyed::*;
 pub use len::Len;
+pub use loadable::{Loadable, LoadableSubfield};
+pub use loadable_keyed::LoadableKeyedSubfield;
 pub use option::*;
 pub use patch::*;
 pub use path::{StorePath, StorePathSegment};

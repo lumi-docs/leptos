@@ -6,8 +6,8 @@ use syn::{
     parse::{Parse, ParseStream, Parser},
     punctuated::Punctuated,
     token::Comma,
-    ExprClosure, Field, Fields, GenericParam, Generics, Ident, Index, Meta,
-    Result, Token, Type, TypeParam, Variant, Visibility, WhereClause,
+    Expr, ExprClosure, Field, Fields, GenericParam, Generics, Ident, Index,
+    Meta, Result, Token, Type, TypeParam, Variant, Visibility, WhereClause,
 };
 
 #[proc_macro_error]
@@ -176,14 +176,27 @@ impl Parse for Model {
 
 #[derive(Clone)]
 enum SubfieldMode {
+    /// Keyed collection field: `#[store(key: Type = |item| item.id)]`
     Keyed(Box<ExprClosure>, Box<Type>),
+    /// Skip this field entirely: `#[store(skip)]`
     Skip,
+    /// Derived/computed field (read-only): `#[store(derived = |store| expr)]`
+    Derived(Box<Expr>),
+    /// Loadable field (async loading state): `#[store(loadable)]`
+    /// The field type should be `Loadable<T, E>`
+    Loadable,
+    /// Loadable + Keyed: `#[store(loadable, key: Type = |item| item.id)]`
+    /// Combines loading state with keyed collection.
+    /// The field type should be the collection type (e.g., `Vec<T>`).
+    /// The macro will auto-generate a `{field}_state: Loadable<(), E>` field.
+    LoadableKeyed(Box<ExprClosure>, Box<Type>),
 }
 
 impl Parse for SubfieldMode {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mode: Ident = input.parse()?;
         if mode == "key" {
+            // #[store(key: Type = |item| ...)]
             let _col: Token![:] = input.parse()?;
             let ty: Type = input.parse()?;
             let _eq: Token![=] = input.parse()?;
@@ -191,8 +204,36 @@ impl Parse for SubfieldMode {
             Ok(SubfieldMode::Keyed(Box::new(closure), Box::new(ty)))
         } else if mode == "skip" {
             Ok(SubfieldMode::Skip)
+        } else if mode == "derived" {
+            // #[store(derived = |store| expr)]
+            let _eq: Token![=] = input.parse()?;
+            let expr: Expr = input.parse()?;
+            Ok(SubfieldMode::Derived(Box::new(expr)))
+        } else if mode == "loadable" {
+            // #[store(loadable)] or #[store(loadable, key: Type = ...)]
+            // Check if followed by comma and key
+            if input.peek(Token![,]) {
+                let _comma: Token![,] = input.parse()?;
+                let key_mode: Ident = input.parse()?;
+                if key_mode == "key" {
+                    let _col: Token![:] = input.parse()?;
+                    let ty: Type = input.parse()?;
+                    let _eq: Token![=] = input.parse()?;
+                    let closure: ExprClosure = input.parse()?;
+                    Ok(SubfieldMode::LoadableKeyed(
+                        Box::new(closure),
+                        Box::new(ty),
+                    ))
+                } else {
+                    Err(input.error("expected `key` after `loadable,`"))
+                }
+            } else {
+                Ok(SubfieldMode::Loadable)
+            }
         } else {
-            Err(input.error("expected `key: <Type> = <closure>`"))
+            Err(input.error(
+                "expected `key`, `skip`, `derived`, or `loadable`",
+            ))
         }
     }
 }
@@ -414,6 +455,87 @@ fn field_to_tokens(
                     };
                 }
                 SubfieldMode::Skip => return quote! {},
+
+                // Derived field: read-only computed field
+                SubfieldMode::Derived(expr) => {
+                    let signature = quote! {
+                        #[track_caller]
+                        fn #ident(self) -> #library_path::DerivedField<#ty>
+                    };
+                    return if include_body {
+                        quote! {
+                            #signature {
+                                // Create Memo from the expression, passing store to closure
+                                let store = self.clone();
+                                #library_path::DerivedField::new(
+                                    ::leptos::prelude::Memo::new(move |_| (#expr)(store.clone()))
+                                )
+                            }
+                        }
+                    } else {
+                        quote! { #signature; }
+                    };
+                }
+
+                // Loadable field (non-keyed): field type is Loadable<T, E>
+                SubfieldMode::Loadable => {
+                    let signature = quote! {
+                        #[track_caller]
+                        fn #ident(self) -> #library_path::LoadableSubfield<#any_store_field, #name #clear_generics, #ty>
+                    };
+                    return if include_body {
+                        quote! {
+                            #signature {
+                                let inner = #library_path::Subfield::new(
+                                    self,
+                                    #idx.into(),
+                                    |prev| &prev.#locator,
+                                    |prev| &mut prev.#locator,
+                                );
+                                #library_path::LoadableSubfield::new(inner)
+                            }
+                        }
+                    } else {
+                        quote! { #signature; }
+                    };
+                }
+
+                // Loadable + Keyed: combines loading state with keyed collection
+                SubfieldMode::LoadableKeyed(keyed_by, key_ty) => {
+                    // For loadable keyed, we expect there to be a companion `{field}_state` field
+                    // in the struct of type `Loadable<(), E>`.
+                    // The accessor returns LoadableKeyedSubfield combining both.
+                    let state_locator =
+                        Ident::new(&format!("{}_state", locator), Span::call_site());
+                    let signature = quote! {
+                        #[track_caller]
+                        fn #ident(self) -> #library_path::LoadableKeyedSubfield<
+                            #any_store_field, #any_store_field, #name #clear_generics, #key_ty, #ty
+                        >
+                    };
+                    return if include_body {
+                        quote! {
+                            #signature {
+                                let state = #library_path::Subfield::new(
+                                    self.clone(),
+                                    (#idx).into(),  // State field at idx
+                                    |prev| &prev.#state_locator,
+                                    |prev| &mut prev.#state_locator,
+                                );
+                                let data = #library_path::KeyedSubfield::new(
+                                    self,
+                                    (#idx + 1).into(),  // Data field at idx+1
+                                    #keyed_by,
+                                    |prev| &prev.#locator,
+                                    |prev| &mut prev.#locator,
+                                );
+                                #library_path::LoadableKeyedSubfield::new(state, data)
+                            }
+                        }
+                    } else {
+                        quote! { #signature; }
+                    };
+                }
             }
         } else {
             abort!(
