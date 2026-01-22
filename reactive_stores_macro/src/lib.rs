@@ -264,11 +264,11 @@ impl ToTokens for Model {
                     } = &w;
                     quote! {
                         #where_token
-                            #any_store_field: #library_path::StoreField<Value = #name < #clear_params > >,
+                            #any_store_field: #library_path::StoreField<Value = #name < #clear_params > > + Clone,
                             #predicates
                     }
                 })
-                .unwrap_or_else(|| quote! { where #any_store_field: #library_path::StoreField<Value = #name < #clear_params > > })
+                .unwrap_or_else(|| quote! { where #any_store_field: #library_path::StoreField<Value = #name < #clear_params > > + Clone })
         };
 
         // define an extension trait that matches this struct
@@ -470,9 +470,13 @@ fn field_to_tokens(
                                     .expect("derived fields require a store with memo cache");
 
                                 // Get or create the memo for this field index
+                                // Type annotation on store resolves inference for user closures
                                 let memo = cache.get_or_create(#idx, || {
-                                    let store = self.clone();
-                                    ::leptos::prelude::Memo::new(move |_| (#expr)(store.clone()))
+                                    let store: #any_store_field = self.clone();
+                                    ::leptos::prelude::Memo::new(move |_| {
+                                        let store: #any_store_field = store.clone();
+                                        (#expr)(store)
+                                    })
                                 });
 
                                 #library_path::DerivedField::new(memo)
