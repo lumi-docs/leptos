@@ -240,6 +240,7 @@
 //! path; calling `.write()` returns a writeable guard, and notifies that same trigger.
 
 use reactive_graph::{
+    computed::Memo,
     owner::{ArenaItem, LocalStorage, Storage, SyncStorage},
     signal::{
         guards::{Plain, ReadGuard, WriteGuard},
@@ -446,6 +447,68 @@ impl Default for KeyMap {
     }
 }
 
+/// Thread-safe cache for lazily-initialized derived field memos.
+///
+/// Each derived field is identified by a field index. On first access,
+/// a memo is created and cached. Subsequent accesses return the same memo.
+#[derive(Clone)]
+pub struct DerivedMemoCache(HashMap<usize, Box<dyn Any + Send + Sync>>);
+
+impl Default for DerivedMemoCache {
+    fn default() -> Self {
+        #[cfg(not(target_arch = "wasm32"))]
+        return Self(Default::default());
+        #[cfg(target_arch = "wasm32")]
+        return Self(send_wrapper::SendWrapper::new(Default::default()));
+    }
+}
+
+impl DerivedMemoCache {
+    /// Get or create a derived memo for a field index.
+    ///
+    /// If the memo already exists, returns the cached version.
+    /// If not, calls `create` to make one and caches it.
+    pub fn get_or_create<T, F>(&self, idx: usize, create: F) -> Memo<T>
+    where
+        T: Clone + Send + Sync + 'static,
+        F: FnOnce() -> Memo<T>,
+    {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            // Check if already exists
+            if let Some(entry) = self.0.get(&idx) {
+                return entry
+                    .downcast_ref::<Memo<T>>()
+                    .expect("derived memo type mismatch")
+                    .clone();
+            }
+            // Create and insert
+            let memo = create();
+            self.0.insert(idx, Box::new(memo.clone()));
+            memo
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let mut map = self.0.borrow_mut();
+            if let Some(entry) = map.get(&idx) {
+                return entry
+                    .downcast_ref::<Memo<T>>()
+                    .expect("derived memo type mismatch")
+                    .clone();
+            }
+            let memo = create();
+            map.insert(idx, Box::new(memo.clone()));
+            memo
+        }
+    }
+}
+
+impl Debug for DerivedMemoCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DerivedMemoCache").finish_non_exhaustive()
+    }
+}
+
 impl KeyMap {
     fn with_field_keys<K, T>(
         &self,
@@ -529,6 +592,7 @@ pub struct ArcStore<T> {
     pub(crate) value: Arc<RwLock<T>>,
     signals: Arc<RwLock<TriggerMap>>,
     keys: KeyMap,
+    derived_memos: DerivedMemoCache,
 }
 
 impl<T> ArcStore<T> {
@@ -540,7 +604,13 @@ impl<T> ArcStore<T> {
             value: Arc::new(RwLock::new(value)),
             signals: Default::default(),
             keys: Default::default(),
+            derived_memos: Default::default(),
         }
+    }
+
+    /// Returns the derived memo cache for this store.
+    pub fn derived_memos(&self) -> &DerivedMemoCache {
+        &self.derived_memos
     }
 }
 
@@ -569,6 +639,7 @@ impl<T> Clone for ArcStore<T> {
             value: Arc::clone(&self.value),
             signals: Arc::clone(&self.signals),
             keys: self.keys.clone(),
+            derived_memos: self.derived_memos.clone(),
         }
     }
 }

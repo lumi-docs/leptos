@@ -1,6 +1,6 @@
 use crate::{
     path::{StorePath, StorePathSegment},
-    ArcStore, KeyMap, Store, StoreFieldTrigger,
+    ArcStore, DerivedMemoCache, KeyMap, Store, StoreFieldTrigger,
 };
 use or_poisoned::OrPoisoned;
 use reactive_graph::{
@@ -65,6 +65,14 @@ pub trait StoreField: Sized {
     /// The keys for this field, if it is a keyed field.
     #[track_caller]
     fn keys(&self) -> Option<KeyMap>;
+
+    /// Returns the derived memo cache for this store, if available.
+    ///
+    /// This is used by derived fields to lazily cache their memos.
+    /// Returns `None` for non-root store fields (like `Subfield`).
+    fn derived_memos(&self) -> Option<DerivedMemoCache> {
+        None
+    }
 
     /// Returns triggers for this field, and all parent fields.
     fn triggers_for_current_path(&self) -> Vec<ArcTrigger> {
@@ -190,6 +198,10 @@ where
     fn keys(&self) -> Option<KeyMap> {
         Some(self.keys.clone())
     }
+
+    fn derived_memos(&self) -> Option<DerivedMemoCache> {
+        Some(self.derived_memos().clone())
+    }
 }
 
 impl<T, S> StoreField for Store<T, S>
@@ -246,5 +258,11 @@ where
     #[track_caller]
     fn keys(&self) -> Option<KeyMap> {
         self.inner.try_get_value().and_then(|inner| inner.keys())
+    }
+
+    fn derived_memos(&self) -> Option<DerivedMemoCache> {
+        self.inner
+            .try_get_value()
+            .map(|inner| inner.derived_memos().clone())
     }
 }

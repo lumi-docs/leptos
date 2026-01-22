@@ -465,11 +465,17 @@ fn field_to_tokens(
                     return if include_body {
                         quote! {
                             #signature {
-                                // Create Memo from the expression, passing store to closure
-                                let store = self.clone();
-                                #library_path::DerivedField::new(
+                                // Get memo cache from store and lazily create memo
+                                let cache = #library_path::StoreField::derived_memos(&self)
+                                    .expect("derived fields require a store with memo cache");
+
+                                // Get or create the memo for this field index
+                                let memo = cache.get_or_create(#idx, || {
+                                    let store = self.clone();
                                     ::leptos::prelude::Memo::new(move |_| (#expr)(store.clone()))
-                                )
+                                });
+
+                                #library_path::DerivedField::new(memo)
                             }
                         }
                     } else {
