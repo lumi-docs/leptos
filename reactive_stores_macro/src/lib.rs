@@ -568,7 +568,7 @@ fn field_to_tokens(
                     error_ty,
                 } => {
                     // For loadable keyed, we expect there to be a companion `{field}_state` field
-                    // in the struct of type `Loadable<(), E>`.
+                    // IMMEDIATELY BEFORE this field in the struct, of type `Loadable<(), E>`.
                     // The accessor returns LoadableKeyedSubfield combining both.
                     let state_locator =
                         Ident::new(&format!("{}_state", locator), Span::call_site());
@@ -578,18 +578,21 @@ fn field_to_tokens(
                             #any_store_field, #any_store_field, #name #clear_generics, #key_ty, #ty, #error_ty
                         >
                     };
+                    // State field is at idx-1 (immediately before this field)
+                    // Data field is at idx (this field)
+                    let state_idx = idx.saturating_sub(1);
                     return if include_body {
                         quote! {
                             #signature {
                                 let state = #library_path::Subfield::new(
                                     self.clone(),
-                                    (#idx).into(),  // State field at idx
+                                    (#state_idx).into(),  // State field at idx-1
                                     |prev| &prev.#state_locator,
                                     |prev| &mut prev.#state_locator,
                                 );
                                 let data = #library_path::KeyedSubfield::new(
                                     self,
-                                    (#idx + 1).into(),  // Data field at idx+1
+                                    (#idx).into(),  // Data field at idx
                                     #keyed_by,
                                     |prev| &prev.#locator,
                                     |prev| &mut prev.#locator,
