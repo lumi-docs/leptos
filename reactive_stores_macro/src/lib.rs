@@ -298,11 +298,11 @@ impl ToTokens for Model {
                     } = &w;
                     quote! {
                         #where_token
-                            #any_store_field: #library_path::StoreField<Value = #name < #clear_params > > + Clone,
+                            #any_store_field: #library_path::StoreField<Value = #name < #clear_params > > + Clone + Send + Sync + 'static,
                             #predicates
                     }
                 })
-                .unwrap_or_else(|| quote! { where #any_store_field: #library_path::StoreField<Value = #name < #clear_params > > + Clone })
+                .unwrap_or_else(|| quote! { where #any_store_field: #library_path::StoreField<Value = #name < #clear_params > > + Clone + Send + Sync + 'static })
         };
 
         // define an extension trait that matches this struct
